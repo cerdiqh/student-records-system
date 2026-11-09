@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <h1 class="h4 mb-1">Welcome, {{ user }}</h1>
-<p class="text-muted">Your courses for the {{ session|default:"current" }} session. Enter scores, then submit them to the records office for approval.</p>
+<p class="text-muted">Your courses for the {{ session|default:"current" }} session. Enter scores, then submit them to the administrator for approval.</p>
 <div class="card">
   <div class="card-body p-0">
     <table class="table table-hover mb-0 align-middle">
@@ -15,7 +15,7 @@
           <td class="text-end pe-3"><a href="{% url 'course_results' c.pk %}" class="btn btn-sm btn-primary"><i class="bi bi-pencil-square"></i> Enter results</a></td>
         </tr>
       {% empty %}
-        <tr><td colspan="7" class="ps-3 py-3 text-muted">No courses are assigned to you yet. Ask the records office to assign your courses.</td></tr>
+        <tr><td colspan="7" class="ps-3 py-3 text-muted">No courses are assigned to you yet. Ask the administrator to assign your courses.</td></tr>
       {% endfor %}
       </tbody>
     </table>

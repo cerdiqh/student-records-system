@@ -18,7 +18,7 @@ from .models import Student
 
 STUDENT_COLUMNS = ["matric_no", "surname", "first_name", "other_names", "gender", "level", "entry_session",
                    "email", "phone", "date_of_birth", "state_of_origin", "address", "guardian_name", "guardian_phone"]
-STUDENT_REQUIRED = {"matric_no", "surname", "first_name", "gender", "level", "entry_session"}
+STUDENT_REQUIRED = {"matric_no", "surname", "first_name", "gender", "level", "entry_session", "email"}
 
 COURSE_COLUMNS = ["code", "title", "units", "level", "semester", "lecturer_username", "elective"]
 COURSE_REQUIRED = {"code", "title", "units", "level", "semester"}
@@ -66,7 +66,8 @@ def import_students(uploaded_file, department):
         return [], [error]
     sessions = {s.name: s for s in AcademicSession.objects.all()}
     existing = {u.lower() for u in User.objects.values_list("username", flat=True)}
-    seen, errors, valid = set(), [], []
+    existing_emails = {e.lower() for e in User.objects.exclude(email="").values_list("email", flat=True)}
+    seen, seen_emails, errors, valid = set(), set(), [], []
 
     for line, r in rows:
         problems = []
@@ -80,6 +81,14 @@ def import_students(uploaded_file, department):
         for col in ("surname", "first_name"):
             if not r.get(col):
                 problems.append(f"{col} is empty")
+        email = r.get("email", "").lower()
+        if not email or "@" not in email:
+            problems.append("email is missing or invalid")
+        elif email in existing_emails:
+            problems.append(f"{email} is already used by another account")
+        elif email in seen_emails:
+            problems.append(f"{email} appears more than once in the file")
+        r["email"] = email
         gender = r.get("gender", "").upper()[:1]
         if gender not in ("M", "F"):
             problems.append("gender must be M or F")
@@ -103,6 +112,7 @@ def import_students(uploaded_file, department):
             errors.append(f"Row {line}: " + "; ".join(problems))
             continue
         seen.add(matric)
+        seen_emails.add(r["email"])
         valid.append(dict(matric=matric, surname=r["surname"], first=r["first_name"], other=r.get("other_names", ""),
                           gender=gender, level=level, session=session, email=r.get("email", ""),
                           phone=r.get("phone", ""), dob=dob, state=r.get("state_of_origin", ""),

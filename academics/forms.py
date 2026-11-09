@@ -1,4 +1,4 @@
-from django import forms
+﻿from django import forms
 
 from accounts.models import User
 
@@ -27,7 +27,7 @@ class DepartmentForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["head"].queryset = User.objects.filter(role=User.Role.LECTURER, is_active=True)
+        self.fields["head"].queryset = User.objects.filter(role=User.Role.LECTURER, is_active=True, is_approved=True)
         self.fields["head"].label = "Head of Department"
 
 
@@ -38,7 +38,7 @@ class CourseForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["lecturer"].queryset = User.objects.filter(role=User.Role.LECTURER, is_active=True)
+        self.fields["lecturer"].queryset = User.objects.filter(role=User.Role.LECTURER, is_active=True, is_approved=True)
         if not self.instance.pk:
             self.fields["department"].initial = Department.objects.first()
 

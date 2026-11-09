@@ -1,17 +1,28 @@
 {% extends "base.html" %}{% load ui %}
 {% block content %}
 <h1 class="h4 mb-3">Dashboard</h1>
+{% if pending_lecturers %}
+<div class="alert alert-warning d-flex justify-content-between align-items-center">
+  <span><i class="bi bi-person-exclamation"></i> <strong>{{ pending_lecturers }}</strong> lecturer sign-up{{ pending_lecturers|pluralize }} waiting for your approval.</span>
+  <a href="{% url 'user_approvals' %}" class="btn btn-sm btn-warning">Review now</a>
+</div>
+{% endif %}
 {% if needs_setup %}
 <div class="card mb-4 border-primary">
-  <div class="card-header bg-primary-subtle"><i class="bi bi-list-check"></i> Getting started — load your department's real data</div>
+  <div class="card-header bg-primary-subtle"><i class="bi bi-list-check"></i> Getting started</div>
   <div class="card-body">
-    <ol class="mb-0">
-      <li class="mb-1">{% if institution.registrar_name or institution.logo %}<i class="bi bi-check-circle-fill text-success"></i>{% endif %} Check your institution details and upload the logo — <a href="{% url 'institution_settings' %}">Institution Settings</a>{% if not user.is_admin_role %} (administrator){% endif %}</li>
-      <li class="mb-1">{% if total_lecturers %}<i class="bi bi-check-circle-fill text-success"></i>{% endif %} Create an account for each lecturer — <a href="{% url 'staff_list' %}">Staff Accounts</a>{% if not user.is_admin_role %} (administrator){% endif %}</li>
-      <li class="mb-1">{% if total_courses %}<i class="bi bi-check-circle-fill text-success"></i>{% endif %} Add the department's courses and assign lecturers — <a href="{% url 'course_import' %}">Import courses from CSV</a> or <a href="{% url 'course_create' %}">add one by one</a></li>
-      <li class="mb-1">{% if total_students %}<i class="bi bi-check-circle-fill text-success"></i>{% endif %} Add students — <a href="{% url 'student_import' %}">Import students from CSV</a> or <a href="{% url 'student_create' %}">add one by one</a>, then hand out the login slips</li>
-      <li>Students register their courses; lecturers enter results; you approve them under <a href="{% url 'approval_list' %}">Result Approvals</a>.</li>
+    <ol class="mb-2">
+      <li class="mb-1">Share the sign-up link with lecturers and students (WhatsApp group, notice board, email):
+        <div class="input-group input-group-sm mt-1" style="max-width:520px">
+          <input type="text" class="form-control" id="signup-link" value="{{ signup_url }}" readonly>
+          <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard.writeText(document.getElementById('signup-link').value); this.textContent='Copied'">Copy</button>
+        </div></li>
+      <li class="mb-1">{% if total_lecturers %}<i class="bi bi-check-circle-fill text-success"></i>{% endif %} Approve lecturers as they sign up — <a href="{% url 'user_approvals' %}">Lecturer Approvals</a></li>
+      <li class="mb-1">{% if total_courses %}<i class="bi bi-check-circle-fill text-success"></i>{% endif %} Add the department's courses and assign each to a lecturer — <a href="{% url 'course_create' %}">Add course</a> (or <a href="{% url 'course_import' %}">import many from Excel</a>)</li>
+      <li class="mb-1">{% if total_students %}<i class="bi bi-check-circle-fill text-success"></i>{% endif %} Students sign up, then register their courses</li>
+      <li>Lecturers enter results; you approve them under <a href="{% url 'approval_list' %}">Result Approvals</a>.</li>
     </ol>
+    {% if not email_is_real %}<div class="alert alert-secondary small py-2 mb-0"><i class="bi bi-envelope-exclamation"></i> Email sending is not set up yet, so verification codes only appear in the server terminal. Set it up before real users sign up — see <em>docs/DEPLOYMENT.md → Email</em>.</div>{% endif %}
   </div>
 </div>
 {% endif %}

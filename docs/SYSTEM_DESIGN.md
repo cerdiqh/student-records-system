@@ -15,7 +15,7 @@ In many departments, student records are kept in paper files and separate spread
 ## 2. Objectives
 
 1. Design a normalised relational database that stores all student academic records centrally.
-2. Implement a web application with role-based access for administrators, records officers, lecturers and students.
+2. Implement a web application with self sign-up, email verification and role-based access for administrators, lecturers and students.
 3. Automate grade, GPA and CGPA computation and transcript generation.
 4. Enforce data integrity through validation, a result approval workflow and a tamper-evident audit trail.
 
@@ -42,22 +42,40 @@ The development approach was incremental (iterative waterfall): requirements →
 
 | Role | Permissions |
 |---|---|
-| Administrator | Everything. Manages staff accounts, views the audit log, unlocks approved results and deletes records. |
-| Records Officer | Manages students, courses and sessions. Registers courses for students and approves or returns submitted results. |
-| Lecturer | Views assigned courses. Enters and uploads scores and submits them for approval. |
-| Student | Views own profile and results, registers courses while registration is open, and downloads own transcript. |
+| Administrator | First person to sign up. Approves lecturer sign-ups; manages students, courses and sessions; approves or returns results; views the audit log; unlocks approved results; takes backups. |
+| Lecturer | Signs up, then waits for the administrator's approval. Views assigned courses. Enters and uploads scores and submits them for approval. |
+| Student | Signs up with matric number and email and gets access immediately. Views own profile and results, registers courses while registration is open, and downloads own transcript. |
+
+## 4b. Sign-up and account activation
+
+```mermaid
+flowchart TD
+    A[Visitor opens the site] --> B{Any administrator yet?}
+    B -- No --> C[Administrator sign-up<br/>institution, department, session, admin account]
+    B -- Yes --> D{Student or Lecturer?}
+    D -- Student --> E[Student sign-up<br/>matric no, level, email, password]
+    D -- Lecturer --> F[Lecturer sign-up<br/>staff ID, email, password]
+    C & E & F --> G[6-digit code emailed]
+    G --> H{Code correct within 15 min, max 5 tries?}
+    H -- No --> G
+    H -- Yes, admin or student --> I[Dashboard]
+    H -- Yes, lecturer --> J[Waiting for approval<br/>admin is emailed]
+    J -- Admin approves --> I
+    J -- Admin rejects --> K[Account disabled]
+```
 
 ## 5. Use case diagram
 
 ```mermaid
 flowchart LR
     Admin((Administrator))
-    Reg((Records Officer))
     Lec((Lecturer))
     Stu((Student))
 
     subgraph SARS [Student Academic Records System]
+      UC0[Sign up + confirm email by code]
       UC1[Log in / change password]
+      UC12[Approve lecturer sign-ups]
       UC2[Manage staff accounts]
       UC3[View audit log]
       UC4[Manage student records]
@@ -70,10 +88,9 @@ flowchart LR
       UC11[Generate transcript]
     end
 
-    Admin --- UC1 & UC2 & UC3 & UC9
-    Reg --- UC1 & UC4 & UC5 & UC6 & UC9 & UC11
-    Lec --- UC1 & UC7 & UC8
-    Stu --- UC1 & UC6 & UC10 & UC11
+    Admin --- UC0 & UC1 & UC2 & UC3 & UC4 & UC5 & UC9 & UC11 & UC12
+    Lec --- UC0 & UC1 & UC7 & UC8
+    Stu --- UC0 & UC1 & UC6 & UC10 & UC11
 ```
 
 ## 6. Database design (ERD)
@@ -99,7 +116,10 @@ erDiagram
         string first_name
         string last_name
         string email
-        string role "ADMIN|REGISTRAR|LECTURER|STUDENT"
+        string role "ADMIN|LECTURER|STUDENT"
+        bool email_verified
+        bool is_approved
+        string email_code "hashed 6-digit code"
     }
     DEPARTMENT {
         int id PK
@@ -187,8 +207,8 @@ stateDiagram-v2
     [*] --> Draft: lecturer enters scores
     Draft --> Draft: save draft / CSV upload
     Draft --> Submitted: lecturer submits
-    Submitted --> Draft: records officer returns for correction
-    Submitted --> Approved: records officer approves
+    Submitted --> Draft: administrator returns for correction
+    Submitted --> Approved: administrator approves
     Approved --> Draft: administrator unlocks (logged)
     Approved --> [*]: appears on transcript and in CGPA
 ```
@@ -220,7 +240,7 @@ Automated tests live in `records/tests.py` and run with `python manage.py test`:
 | GPA weighting | GPA is weighted by units; unapproved results are excluded |
 | Unique registration | Database rejects duplicate registrations |
 | Audit trail | Updates are logged with field changes |
-| Access control | Login required; students, lecturers and registrars limited correctly |
+| Access control | Login required; students and lecturers limited correctly |
 | Course registration | Unit limit respected; closed registration blocks students |
 | Result workflow | Enter → submit → approve; approved results locked |
 | Validation | Out-of-range scores rejected |

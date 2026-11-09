@@ -26,18 +26,25 @@ Before either option, do the **common steps**.
      python -c "import secrets; print(secrets.token_urlsafe(50))"
      ```
    - set `DEBUG=False`;
-   - list the addresses users will type in `ALLOWED_HOSTS`.
+   - list the addresses users will type in `ALLOWED_HOSTS`;
+   - **fill in the `EMAIL_*` lines.** This is required: everyone confirms their email with a code when signing up. See *Email* below.
 4. **Create the database and collect the stylesheets:**
    ```bash
    python manage.py migrate
    python manage.py collectstatic --noinput
    ```
-5. **Start the server** (see Option A or B), then open the site in a browser. The **first-time setup page** appears automatically:
+5. **Start the server** (see Option A or B), then open the site in a browser. The **Administrator sign-up** page appears automatically:
    - enter the real institution, faculty and department;
    - enter the current session;
-   - create your administrator account.
+   - enter your own name, email and password.
 
-   This page appears only once.
+   Then enter the 6-digit code sent to your email. This page appears only once; after that, the first visitor's account is the administrator.
+6. **Share the sign-up link** `https://<your-site>/signup/` with lecturers and students. Approve lecturers under **Lecturer Approvals** as they sign up.
+
+If the administrator is stuck on the code page because email is not working yet, run this on the server:
+```bash
+python manage.py verify_user your@email.com
+```
 
 **Do NOT run `seed_demo` on a real installation.** It is disabled when `DEBUG=False`.
 
@@ -112,17 +119,26 @@ Then click **Reload** on the Web tab.
 
 ---
 
-## Email for "Forgot password" (optional)
+## Email (required for sign-up)
 
-Without email settings, users who forget their password ask the records office, which uses the **Reset password** button.
+The system sends emails for:
 
-To send reset links by email with Gmail:
+- sign-up verification codes;
+- "a lecturer is waiting for approval" notices to the admin;
+- "your account was approved" notices to the lecturer;
+- "forgot password" links.
+
+**Without email settings** (test mode), the emails are printed in the terminal window where the server runs instead of being sent. That is fine for testing on your own computer, but real users won't receive their codes.
+
+To send real emails with Gmail:
 
 1. Turn on 2-Step Verification on the Gmail account.
 2. Create an **App Password** at https://myaccount.google.com/apppasswords.
 3. Fill in the `EMAIL_*` lines in `.env`, then restart the server.
 
-Only users with an email address on their account can reset their own password.
+4. Check that the **Institution Settings** page shows "Email sending is set up".
+
+Gmail allows about 500 emails per day, which is plenty for a department.
 
 ---
 
@@ -148,12 +164,12 @@ Choose one, or both:
 ## Going live: checklist
 
 - [ ] `DEBUG=False` and a unique `SECRET_KEY` in `.env`
-- [ ] First-time setup done with the **real** institution and department names
+- [ ] Email sending set up and tested (sign up a test student, check the code arrives)
+- [ ] Administrator sign-up done with the **real** institution and department names
 - [ ] Logo uploaded and registrar name set (*Institution Settings*)
 - [ ] Grading scale and degree classes in `config/settings.py` match your institution's handbook
-- [ ] Lecturer accounts created; temporary passwords given privately
-- [ ] Courses imported and lecturers assigned
-- [ ] Students imported; login slips printed and handed out
+- [ ] Sign-up link shared; lecturers approved as they sign up
+- [ ] Courses added and each assigned to a lecturer
 - [ ] Backup tested (download one, then restore it on a test copy)
 - [ ] (Online) HTTPS on, with `USE_HTTPS=True`
 

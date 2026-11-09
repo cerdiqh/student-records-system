@@ -113,13 +113,13 @@ def build_transcript_pdf(student):
         Spacer(1, 6 * mm),
         Paragraph(
             "Grading: " + ", ".join(f"{g} ({m}+) = {p}" for m, g, p in settings.GRADING_SCALE)
-            + ". Only results approved by the records office appear on this transcript.",
+            + ". Only results approved by the administrator appear on this transcript.",
             small,
         ),
         Spacer(1, 14 * mm),
         Paragraph("______________________________<br/>"
                   + (f"{institution.registrar_name}<br/>" if institution and institution.registrar_name else "")
-                  + "Records Officer / Registrar", styles["Normal"]),
+                  + "Registrar", styles["Normal"]),
     ]
 
     doc.build(story)

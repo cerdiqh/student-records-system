@@ -14,6 +14,13 @@ urlpatterns = [
 
     # First-run setup and authentication
     path("setup/", accounts.setup, name="setup"),
+    path("signup/", accounts.signup, name="signup"),
+    path("signup/student/", accounts.signup_student, name="signup_student"),
+    path("signup/lecturer/", accounts.signup_lecturer, name="signup_lecturer"),
+    path("verify-email/", accounts.verify_email, name="verify_email"),
+    path("awaiting-approval/", accounts.pending_approval, name="pending_approval"),
+    path("approvals/lecturers/", accounts.user_approvals, name="user_approvals"),
+    path("approvals/lecturers/<int:pk>/", accounts.approve_user, name="approve_user"),
     path("login/", accounts.LoginView.as_view(), name="login"),
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("password/", accounts.PasswordChangeView.as_view(), name="password_change"),

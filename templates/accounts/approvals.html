@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Lecturer approvals{% endblock %}
+{% block content %}
+<h1 class="h4 mb-1">Lecturer approvals</h1>
+<p class="text-muted">People who signed up as lecturers. Check that each one is really a member of staff before approving. Approved lecturers can enter results for courses you assign to them.</p>
+<div class="card"><div class="card-body p-0 table-responsive">
+  <table class="table table-hover mb-0 align-middle">
+    <thead><tr><th class="ps-3">Name</th><th>Email</th><th>Staff ID</th><th>Phone</th><th>Email confirmed</th><th>Signed up</th><th></th></tr></thead>
+    <tbody>
+    {% for u in pending %}
+      <tr>
+        <td class="ps-3 fw-semibold">{{ u }}</td><td>{{ u.email }}</td><td>{{ u.staff_id|default:"-" }}</td><td>{{ u.phone|default:"-" }}</td>
+        <td>{% if u.email_verified %}<span class="badge text-bg-success">Yes</span>{% else %}<span class="badge text-bg-secondary">Not yet</span>{% endif %}</td>
+        <td class="small">{{ u.date_joined|date:"d M Y H:i" }}</td>
+        <td class="text-end pe-3 text-nowrap">
+          <form method="post" action="{% url 'approve_user' u.pk %}" class="d-inline">{% csrf_token %}
+            <button name="action" value="approve" class="btn btn-sm btn-success"><i class="bi bi-check-lg"></i> Approve</button>
+            <button name="action" value="reject" class="btn btn-sm btn-outline-danger" onclick="return confirm('Reject {{ u }}? Their account will be disabled.')">Reject</button>
+          </form>
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="7" class="ps-3 py-3 text-muted">No lecturer sign-ups are waiting.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div></div>
+{% endblock %}

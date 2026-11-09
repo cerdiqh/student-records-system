@@ -1,0 +1,20 @@
+{% extends "auth_base.html" %}
+{% block title %}Confirm your email{% endblock %}
+{% block heading %}Confirm your email{% endblock %}
+{% block body %}
+<p class="small">We sent a 6-digit code to <strong>{{ user.email }}</strong>. Enter it below to activate your account. Check your spam folder if you can't find it.</p>
+{% if not email_is_real %}
+  <div class="alert alert-secondary small py-2"><i class="bi bi-terminal"></i> <strong>Test mode:</strong> email sending is not set up yet, so the code is printed in the terminal window where the server is running.</div>
+{% endif %}
+<form method="post" class="mb-3">{% csrf_token %}
+  <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}"
+         class="form-control form-control-lg text-center" style="letter-spacing: .5em" placeholder="000000" autofocus required>
+  <button name="action" value="verify" class="btn btn-primary w-100 mt-3">Confirm</button>
+</form>
+<form method="post" class="text-center">{% csrf_token %}
+  <button name="action" value="resend" class="btn btn-link btn-sm" {% if resend_wait %}title="Wait {{ resend_wait }} seconds"{% endif %}>Send a new code</button>
+</form>
+<form method="post" action="{% url 'logout' %}" class="text-center">{% csrf_token %}
+  <button class="btn btn-link btn-sm text-muted">Wrong email? Sign out</button>
+</form>
+{% endblock %}

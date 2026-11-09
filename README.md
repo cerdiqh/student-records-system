@@ -17,11 +17,12 @@ Built with **Python 3.11** and **Django 5.2**. It runs on SQLite out of the box,
 
 | Area | What it does |
 |---|---|
-| **First-time setup** | A brand-new installation opens a setup page. There you enter the real institution, faculty, department and current session, and create the administrator account. No demo data is involved. |
-| **Roles** | Administrator, Records Officer, Lecturer and Student. Each sees only their own menu and data. |
-| **Accounts and passwords** | New users get a temporary password, shown once, and **must change it at first login**. Staff can **reset** forgotten passwords. Optional **"Forgot password" by email**. Accounts **lock for 15 minutes after 5 failed logins**. |
+| **Self sign-up** | Everyone creates their own account with their real email. The **first person** to open the site signs up as **Administrator** and enters the institution, department and current session. **Students** sign up with their matric number and use their dashboard straight away. **Lecturers** sign up and wait until the administrator **approves** them. |
+| **Email verification** | Every new account receives a **6-digit code** by email, which must be entered before the account works. Codes expire after 15 minutes, allow 5 attempts, and are stored hashed. |
+| **Roles** | Administrator, Lecturer and Student. Each sees only their own menu and data. |
+| **Sign-in and passwords** | Sign in with email (students may also use their matric number). **"Forgot password" by email.** The administrator can also reset a password, and the user must then choose a new one. Accounts **lock for 15 minutes after 5 failed sign-ins**. |
 | **Student records** | Create, view, update and delete bio-data, including a passport photo. Search, filters and CSV export. |
-| **Bulk import** | Import real students and courses from Excel/CSV templates. The whole file is checked first, and nothing is imported if any row is wrong. After a student import, printable **login slips** can be downloaded once. |
+| **Bulk import (optional)** | The administrator can import many courses, or students, from an Excel/CSV file instead of typing them one by one. |
 | **Academic structure** | Institution settings (name, address, logo, registrar), department, academic sessions, and courses with units, level, semester and lecturer. |
 | **Course registration** | Students register the current semester's courses. Failed courses are added automatically as carry-overs. The unit limit is enforced, and registration can be opened or closed. |
 | **Results** | Lecturers enter CA and exam scores on screen or by CSV upload. Results go Draft → Submitted → Approved. Approved results are locked. Blank scores stay "not entered" and are never counted as 0. |
@@ -58,15 +59,17 @@ python manage.py migrate
 python manage.py runserver
 ```
 
-Open http://127.0.0.1:8000. The first-time setup page appears.
+Open http://127.0.0.1:8000. The **Administrator sign-up** page appears.
 
-### Getting real data in (after setup)
+Until email sending is set up, verification codes are printed in the terminal where the server runs (test mode). To send real emails, see *Email* in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
-1. **Staff Accounts:** create each lecturer. Give them their temporary password privately.
-2. **Courses → Import from CSV:** download the template, fill in your department's courses in Excel, save as CSV and upload.
-3. **Import Students:** same process, then download and hand out the login slips.
-4. **Students** sign in, change their password and register courses.
-5. **Lecturers** enter results; the **Records Officer** approves them.
+### How it works day to day
+
+1. **Administrator** signs up first, then shares the sign-up link (`/signup/`) with lecturers and students.
+2. **Lecturers** sign up, confirm their email, and wait. The administrator approves them under **Lecturer Approvals**.
+3. The administrator adds the department's **courses** and assigns each to a lecturer.
+4. **Students** sign up, confirm their email, and register their courses.
+5. **Lecturers** enter results; the **administrator** approves them; students see their results, CGPA and transcript.
 
 ### Putting it into real use
 
@@ -88,22 +91,23 @@ This loads 40 fictional students and 32 courses. It works only with `DEBUG=True`
 python manage.py test
 ```
 
-The 29 automated tests cover:
+The 31 automated tests cover:
 
-- grading, GPA weighting and the audit trail;
+- admin, student and lecturer sign-up;
+- email-code verification and its attempt limit;
+- lecturer approval and rejection;
+- duplicate email or matric number;
+- sign-in with email or matric number, login lockout and password resets;
 - role-based access;
-- registration rules, and the enter → submit → approve workflow with locking;
-- blank-score handling, CSV result upload and transcripts;
-- first-time setup;
-- temporary passwords with forced change, login lockout and password resets;
-- student and course import (including all-or-nothing validation);
-- promotion, graduation and backups.
+- grading, GPA and the audit trail;
+- course registration, and the result entry → approval workflow;
+- CSV upload, transcripts, promotion, graduation, course import and backups.
 
 ## Project structure
 
 ```
 config/        settings, URL routes
-accounts/      User model with roles, setup wizard, login lockout, password rules, staff management
+accounts/      User model with roles, sign-up, email verification, lecturer approval, login lockout
 academics/     Institution, Department, AcademicSession, Course
 records/       Student, Registration, Result, AuditLog; views, grading, importers, PDF transcript, audit signals
   management/commands/backup.py      scheduled backups

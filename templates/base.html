@@ -24,7 +24,7 @@
     {% if user.is_staff_member %}
       <li class="section">Records</li>
       <li><a class="nav-link {% if url in 'student_list student_create student_detail student_edit' %}active{% endif %}" href="{% url 'student_list' %}"><i class="bi bi-people"></i> Students</a></li>
-      <li><a class="nav-link {% if url == 'student_import' %}active{% endif %}" href="{% url 'student_import' %}"><i class="bi bi-file-earmark-arrow-up"></i> Import Students</a></li>
+      <li><a class="nav-link {% if url == 'user_approvals' %}active{% endif %}" href="{% url 'user_approvals' %}"><i class="bi bi-person-check"></i> Lecturer Approvals{% if pending_lecturers %} <span class="badge rounded-pill text-bg-warning ms-1">{{ pending_lecturers }}</span>{% endif %}</a></li>
       <li><a class="nav-link {% if url == 'approval_list' %}active{% endif %}" href="{% url 'approval_list' %}"><i class="bi bi-check2-square"></i> Result Approvals</a></li>
       <li><a class="nav-link {% if url == 'promote_students' %}active{% endif %}" href="{% url 'promote_students' %}"><i class="bi bi-arrow-up-circle"></i> Promotion &amp; Graduation</a></li>
     {% endif %}
@@ -40,7 +40,7 @@
     {% if user.is_admin_role %}
       <li class="section">Administration</li>
       <li><a class="nav-link {% if url == 'institution_settings' %}active{% endif %}" href="{% url 'institution_settings' %}"><i class="bi bi-building"></i> Institution Settings</a></li>
-      <li><a class="nav-link {% if url in 'staff_list staff_create staff_edit' %}active{% endif %}" href="{% url 'staff_list' %}"><i class="bi bi-person-badge"></i> Staff Accounts</a></li>
+      <li><a class="nav-link {% if url in 'staff_list staff_create staff_edit' %}active{% endif %}" href="{% url 'staff_list' %}"><i class="bi bi-person-badge"></i> Lecturers &amp; Admins</a></li>
       <li><a class="nav-link {% if url == 'audit_log' %}active{% endif %}" href="{% url 'audit_log' %}"><i class="bi bi-shield-check"></i> Audit Log</a></li>
       <li><a class="nav-link" href="{% url 'admin:index' %}"><i class="bi bi-gear"></i> Django Admin</a></li>
     {% endif %}

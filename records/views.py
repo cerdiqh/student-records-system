@@ -60,7 +60,7 @@ def dashboard(request):
         ctx.update(
             total_students=Student.objects.filter(status=Student.Status.ACTIVE).count(),
             total_courses=Course.objects.filter(is_active=True).count(),
-            total_lecturers=User.objects.filter(role=User.Role.LECTURER, is_active=True).count(),
+            total_lecturers=User.objects.filter(role=User.Role.LECTURER, is_active=True, is_approved=True).count(),
             registrations=Registration.objects.filter(session=session).count() if session else 0,
             by_level=Student.objects.filter(status=Student.Status.ACTIVE)
             .values("level").annotate(n=Count("id")).order_by("level"),
@@ -72,6 +72,8 @@ def dashboard(request):
             recent_logs=AuditLog.objects.select_related("user")[:8],
         )
         ctx["needs_setup"] = not (ctx["total_lecturers"] and ctx["total_courses"] and ctx["total_students"])
+        ctx["signup_url"] = request.build_absolute_uri(reverse("signup"))
+        ctx["email_is_real"] = settings.EMAIL_BACKEND.endswith("smtp.EmailBackend")
         return render(request, "records/dashboard_staff.html", ctx)
 
     if user.is_lecturer:
@@ -87,7 +89,7 @@ def dashboard(request):
     if user.is_student:
         student = getattr(user, "student_profile", None)
         if student is None:
-            raise PermissionDenied("Your account is not linked to a student record. Contact the records office.")
+            raise PermissionDenied("Your account is not linked to a student record. Contact the administrator.")
         current_regs = Registration.objects.filter(student=student, session=session).select_related("course", "result") if session else []
         ctx.update(
             student=student,
@@ -214,7 +216,7 @@ def register_courses(request, pk=None):
             raise PermissionDenied
     session = AcademicSession.get_current()
     if session is None:
-        messages.error(request, "No current academic session. Contact the records office.")
+        messages.error(request, "No current academic session. Contact the administrator.")
         return redirect("dashboard")
     semester = session.current_semester
     can_edit = user.is_staff_member or (session.registration_open and student.status == Student.Status.ACTIVE)
@@ -277,7 +279,7 @@ def register_courses(request, pk=None):
 
 
 # ---------------------------------------------------------------------------
-# Results entry (lecturers) and approval (records office)
+# Results entry (lecturers) and approval (administrator)
 # ---------------------------------------------------------------------------
 @lecturer_or_staff_required
 def course_results(request, pk):
@@ -312,7 +314,7 @@ def course_results(request, pk):
                             missing += 1
                     obj.save()
             if action == "submit":
-                messages.success(request, f"{submitted} result(s) for {course.code} submitted to the records office for approval.")
+                messages.success(request, f"{submitted} result(s) for {course.code} submitted to the administrator for approval.")
                 if missing:
                     messages.warning(request, f"{missing} student(s) have no scores yet and were kept as draft.")
             else:

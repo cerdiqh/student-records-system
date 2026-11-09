@@ -44,7 +44,7 @@
     <tr><th>Total units passed</th><td>{{ units_passed }}</td></tr>
     <tr><th>Class of degree (current standing)</th><td>{{ degree_class }}</td></tr>
   </table>
-  <p class="small text-muted">Grading: {% for m, g, p in grading_scale %}{{ g }} ({{ m }}+) = {{ p }}{% if not forloop.last %}, {% endif %}{% endfor %}. Only results approved by the records office appear on this transcript.</p>
-  <div class="mt-5 pt-3">______________________________<br>{% if institution.registrar_name %}{{ institution.registrar_name }}<br>{% endif %}Records Officer / Registrar</div>
+  <p class="small text-muted">Grading: {% for m, g, p in grading_scale %}{{ g }} ({{ m }}+) = {{ p }}{% if not forloop.last %}, {% endif %}{% endfor %}. Only results approved by the administrator appear on this transcript.</p>
+  <div class="mt-5 pt-3">______________________________<br>{% if institution.registrar_name %}{{ institution.registrar_name }}<br>{% endif %}Registrar</div>
 </div>
 {% endblock %}

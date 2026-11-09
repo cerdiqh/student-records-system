@@ -1,0 +1,28 @@
+{% extends "auth_base.html" %}
+{% block title %}Create an account{% endblock %}
+{% block card_class %}setup-card{% endblock %}
+{% block heading %}Create your account{% endblock %}
+{% block body %}
+<p class="text-center text-muted small">Who are you?</p>
+<div class="row g-3">
+  <div class="col-md-6">
+    <a href="{% url 'signup_student' %}" class="card h-100 text-decoration-none text-dark signup-option">
+      <div class="card-body text-center py-4">
+        <i class="bi bi-person-badge fs-1 text-primary"></i>
+        <h2 class="h5 mt-2">I am a Student</h2>
+        <p class="small text-muted mb-0">Register with your matric number and email. You can use your dashboard as soon as your email is confirmed.</p>
+      </div>
+    </a>
+  </div>
+  <div class="col-md-6">
+    <a href="{% url 'signup_lecturer' %}" class="card h-100 text-decoration-none text-dark signup-option">
+      <div class="card-body text-center py-4">
+        <i class="bi bi-person-workspace fs-1 text-success"></i>
+        <h2 class="h5 mt-2">I am a Lecturer</h2>
+        <p class="small text-muted mb-0">Register with your email and staff ID. The department administrator must approve your account first.</p>
+      </div>
+    </a>
+  </div>
+</div>
+<div class="text-center mt-4 small">Already have an account? <a href="{% url 'login' %}">Sign in</a></div>
+{% endblock %}

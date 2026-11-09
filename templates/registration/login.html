@@ -6,7 +6,7 @@
 <form method="post">
   {% csrf_token %}
   <div class="mb-3">
-    <label class="form-label" for="id_username">Username or matric number</label>
+    <label class="form-label" for="id_username">Email (students may also use matric number)</label>
     {{ form.username|bs }}
   </div>
   <div class="mb-3">
@@ -17,4 +17,6 @@
   <button class="btn btn-primary w-100" style="background: var(--sars-navy); border-color: var(--sars-navy)">Sign in</button>
 </form>
 <div class="text-center mt-3 small"><a href="{% url 'password_reset' %}">Forgot your password?</a></div>
+<hr>
+<div class="text-center small">New here? <a href="{% url 'signup' %}" class="fw-semibold">Create an account</a></div>
 {% endblock %}

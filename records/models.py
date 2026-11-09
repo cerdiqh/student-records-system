@@ -159,7 +159,7 @@ class Registration(models.Model):
 
 
 class Result(models.Model):
-    """Score for one registration. Lecturers enter it; the records officer approves it."""
+    """Score for one registration. Lecturers enter it; the administratorr approves it."""
 
     class Status(models.TextChoices):
         DRAFT = "DRAFT", "Draft"

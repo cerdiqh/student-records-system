@@ -4,7 +4,7 @@ Populate the database with realistic demo data for presentation and testing.
     python manage.py seed_demo
 
 Creates: 1 department, 4 academic sessions, 32 courses (100-400 level),
-an admin, a records officer, 4 lecturers and 40 students with full result
+an admin, 4 lecturers and 40 students with full result
 histories (past sessions approved; current session partly entered).
 """
 import random
@@ -66,14 +66,13 @@ class Command(BaseCommand):
 
         def make_user(username, first, last, role, title="", email=None, **extra):
             user, _ = User.objects.get_or_create(username=username, defaults=dict(
-                first_name=first, last_name=last, role=role, title=title,
+                first_name=first, last_name=last, role=role, title=title, email_verified=True,
                 email=email or f"{username.lower().replace('/', '.')}@example.edu", **extra))
             user.set_password(DEMO_PASSWORD if username != "admin" else "Admin@1234")
             user.save()
             return user
 
         make_user("admin", "System", "Administrator", User.Role.ADMIN, is_staff=True, is_superuser=True)
-        make_user("registrar", "Grace", "Adebayo", User.Role.REGISTRAR, "Mrs.")
         lecturers = [
             make_user("lecturer1", "Ibrahim", "Musa", User.Role.LECTURER, "Dr."),
             make_user("lecturer2", "Ngozi", "Okeke", User.Role.LECTURER, "Prof."),
@@ -150,6 +149,5 @@ class Command(BaseCommand):
             f"Demo data loaded: {Student.objects.count()} students, {Course.objects.count()} courses, "
             f"{Result.objects.count()} results.\n"
             f"  Admin:           admin / Admin@1234\n"
-            f"  Records officer: registrar / {DEMO_PASSWORD}\n"
             f"  Lecturer:        lecturer1 / {DEMO_PASSWORD}\n"
             f"  Student:         CSC/2024/001 / {DEMO_PASSWORD}"))

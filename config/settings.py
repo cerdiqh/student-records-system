@@ -57,8 +57,8 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     # Sends visitors to the first-run setup page until an administrator exists.
     "accounts.middleware.SetupRequiredMiddleware",
-    # Forces users with a temporary password to choose their own.
-    "accounts.middleware.ForcePasswordChangeMiddleware",
+    # Unverified email -> verify page; unapproved lecturer -> waiting page; temp password -> change page.
+    "accounts.middleware.AccountStatusMiddleware",
     # Records which user made each change, for the audit trail.
     "records.middleware.CurrentUserMiddleware",
 ]
@@ -121,6 +121,7 @@ else:
     }
 
 AUTH_USER_MODEL = "accounts.User"
+AUTHENTICATION_BACKENDS = ["accounts.backends.EmailOrUsernameBackend"]
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -151,6 +152,7 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STATIC_ROOT.mkdir(exist_ok=True)  # avoids a WhiteNoise warning before the first collectstatic
 MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT", BASE_DIR / "media"))
 BACKUP_DIR = Path(os.environ.get("BACKUP_DIR", BASE_DIR / "backups"))
 STORAGES = {

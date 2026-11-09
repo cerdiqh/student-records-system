@@ -1,26 +1,30 @@
 {% extends "base.html" %}
-{% block title %}Staff accounts{% endblock %}
+{% block title %}Lecturers and admins{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h1 class="h4 mb-0">Staff accounts</h1>
-  <a href="{% url 'staff_create' %}" class="btn btn-sm btn-primary"><i class="bi bi-person-plus"></i> New staff account</a>
+  <h1 class="h4 mb-0">Lecturers &amp; admins</h1>
+  <a href="{% url 'staff_create' %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-person-plus"></i> Add account manually</a>
 </div>
+<p class="small text-muted">Lecturers normally sign up themselves and appear under <a href="{% url 'user_approvals' %}">Lecturer Approvals</a>. Use "Add account manually" only for someone who cannot sign up.</p>
 <form class="row g-2 mb-3" method="get">
-  <div class="col-md-5"><input type="search" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Search name, username or email"></div>
+  <div class="col-md-5"><input type="search" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Search name, email or staff ID"></div>
   <div class="col-md-3"><select name="role" class="form-select form-select-sm"><option value="">All roles</option>{% for v, l in roles %}{% if v != "STUDENT" %}<option value="{{ v }}" {% if role == v %}selected{% endif %}>{{ l }}</option>{% endif %}{% endfor %}</select></div>
   <div class="col-md-4"><button class="btn btn-sm btn-secondary">Filter</button></div>
 </form>
 <div class="card"><div class="card-body p-0 table-responsive">
   <table class="table table-hover mb-0 align-middle">
-    <thead><tr><th class="ps-3">Name</th><th>Username</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th class="ps-3">Name</th><th>Email</th><th>Staff ID</th><th>Role</th><th>Status</th><th></th></tr></thead>
     <tbody>
     {% for u in page %}
-      <tr><td class="ps-3">{{ u }}</td><td>{{ u.username }}</td><td>{{ u.email|default:"-" }}</td><td>{{ u.get_role_display }}</td>
-        <td>{% if u.is_active %}<span class="badge text-bg-success">Active</span>{% else %}<span class="badge text-bg-secondary">Disabled</span>{% endif %}</td>
+      <tr><td class="ps-3">{{ u }}</td><td>{{ u.email|default:u.username }}</td><td>{{ u.staff_id|default:"-" }}</td><td>{{ u.get_role_display }}</td>
+        <td>{% if not u.is_active %}<span class="badge text-bg-secondary">Disabled</span>
+            {% elif not u.is_approved %}<span class="badge text-bg-warning">Awaiting approval</span>
+            {% elif not u.email_verified %}<span class="badge text-bg-light border">Email not confirmed</span>
+            {% else %}<span class="badge text-bg-success">Active</span>{% endif %}</td>
         <td class="text-end pe-3 text-nowrap">
-          {% if u.pk != user.pk %}<form method="post" action="{% url 'reset_password' u.pk %}" class="d-inline" onsubmit="return confirm('Give {{ u.username }} a new temporary password?')">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-sm btn-outline-warning">Reset password</button></form>{% endif %}
+          {% if u.pk != user.pk %}<form method="post" action="{% url 'reset_password' u.pk %}" class="d-inline" onsubmit="return confirm('Give {{ u }} a new temporary password?')">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-sm btn-outline-warning">Reset password</button></form>{% endif %}
           <a href="{% url 'staff_edit' u.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a></td></tr>
-    {% empty %}<tr><td colspan="6" class="ps-3 py-3 text-muted">No staff accounts.</td></tr>{% endfor %}
+    {% empty %}<tr><td colspan="6" class="ps-3 py-3 text-muted">No accounts.</td></tr>{% endfor %}
     </tbody>
   </table>
 </div></div>

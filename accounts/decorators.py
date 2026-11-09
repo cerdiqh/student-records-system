@@ -22,7 +22,7 @@ def role_required(*roles):
     return decorator
 
 
-staff_required = role_required("ADMIN", "REGISTRAR")
 admin_required = role_required("ADMIN")
-lecturer_or_staff_required = role_required("ADMIN", "REGISTRAR", "LECTURER")
+staff_required = admin_required  # the administrator manages all records
+lecturer_or_staff_required = role_required("ADMIN", "LECTURER")
 student_required = role_required("STUDENT")

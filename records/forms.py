@@ -14,7 +14,7 @@ class StudentForm(forms.ModelForm):
     first_name = forms.CharField(max_length=150)
     last_name = forms.CharField(label="Surname", max_length=150)
     other_names = forms.CharField(max_length=150, required=False, help_text="Optional middle name(s)")
-    email = forms.EmailField(required=False, help_text="Needed for 'Forgot password' by email.")
+    email = forms.EmailField(help_text="The student signs in with this email and must confirm it.")
     phone = forms.CharField(max_length=20, required=False)
     password = forms.CharField(
         widget=forms.PasswordInput,
@@ -64,6 +64,15 @@ class StudentForm(forms.ModelForm):
         if password:
             validate_password(password)
         return password
+
+    def clean_email(self):
+        email = self.cleaned_data["email"].strip().lower()
+        clash = User.objects.filter(email__iexact=email)
+        if self.instance.pk:
+            clash = clash.exclude(pk=self.instance.user_id)
+        if clash.exists():
+            raise forms.ValidationError("Another account already uses this email.")
+        return email
 
     def save(self, commit=True):
         from accounts.security import generate_temp_password

@@ -1,0 +1,16 @@
+{% extends "auth_base.html" %}
+{% block title %}{{ kind }} sign up{% endblock %}
+{% block card_class %}setup-card{% endblock %}
+{% block heading %}{{ kind }} sign up{% endblock %}
+{% block body %}
+{% if kind == "Lecturer" %}
+  <div class="alert alert-info small py-2"><i class="bi bi-info-circle"></i> After you confirm your email, the department administrator will check and approve your account. You will get an email when it is approved.</div>
+{% endif %}
+<form method="post" novalidate>{% csrf_token %}
+  {% include "includes/fields.html" %}
+  <button class="btn btn-primary w-100 mt-4">Create account</button>
+</form>
+<div class="text-center mt-3 small">
+  <a href="{% url 'signup' %}">&larr; Back</a> &middot; Already have an account? <a href="{% url 'login' %}">Sign in</a>
+</div>
+{% endblock %}

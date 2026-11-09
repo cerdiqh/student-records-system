@@ -1,9 +1,9 @@
 {% extends "auth_base.html" %}{% load ui %}
 {% block title %}First-time setup{% endblock %}
 {% block card_class %}setup-card{% endblock %}
-{% block heading %}Welcome — first-time setup{% endblock %}
+{% block heading %}Administrator sign up{% endblock %}
 {% block body %}
-<p class="small text-muted">This runs once. Enter your institution's real details and create the administrator account. You can change everything later under <em>Institution Settings</em>.</p>
+<p class="small text-muted">Welcome! No one has signed up yet, so you will become the <strong>administrator</strong> of this system. Enter your institution's real details and your own account. After this, lecturers and students sign up themselves. You can change the details later under <em>Institution Settings</em>.</p>
 <form method="post" novalidate>{% csrf_token %}
   {% if form.non_field_errors %}<div class="alert alert-danger py-2">{{ form.non_field_errors }}</div>{% endif %}
   <h2 class="h6 text-uppercase text-muted mt-2">1. Institution and department</h2>
@@ -27,6 +27,6 @@
         {% for e in field.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}</div>
     {% endif %}{% endfor %}
   </div>
-  <button class="btn btn-primary w-100">Complete setup</button>
+  <button class="btn btn-primary w-100">Create administrator account</button>
 </form>
 {% endblock %}

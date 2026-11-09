@@ -2,6 +2,21 @@
 {% block title %}Institution settings{% endblock %}
 {% block content %}
 <h1 class="h4 mb-3">Institution settings</h1>
+<div class="card mb-3">
+  <div class="card-header">Sign-up link and email</div>
+  <div class="card-body small">
+    <p class="mb-1">Lecturers and students create their accounts at:</p>
+    <div class="input-group input-group-sm mb-3" style="max-width:520px">
+      <input type="text" class="form-control" id="signup-link" value="{{ signup_url }}" readonly>
+      <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard.writeText(document.getElementById('signup-link').value); this.textContent='Copied'">Copy</button>
+    </div>
+    {% if email_is_real %}
+      <span class="badge text-bg-success"><i class="bi bi-envelope-check"></i> Email sending is set up</span> — verification codes and approval notices are sent by email.
+    {% else %}
+      <span class="badge text-bg-warning"><i class="bi bi-envelope-exclamation"></i> Email sending is NOT set up</span> — verification codes only appear in the server terminal. Add your Gmail details to the <code>.env</code> file (see docs/DEPLOYMENT.md → Email) and restart the server.
+    {% endif %}
+  </div>
+</div>
 <form method="post" enctype="multipart/form-data" novalidate>{% csrf_token %}
   <div class="card mb-3">
     <div class="card-header">Institution (printed on transcripts and the login page)</div>
