@@ -178,7 +178,8 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 if env_bool("USE_HTTPS", False):
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-    SECURE_SSL_REDIRECT = True
+    # Off on hosts that redirect to HTTPS themselves (PythonAnywhere "Force HTTPS").
+    SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", True)
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SECURE_HSTS_SECONDS = 60 * 60 * 24 * 30
 
