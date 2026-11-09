@@ -1,0 +1,60 @@
+{% extends "base.html" %}{% load ui %}
+{% block content %}
+<h1 class="h4 mb-3">Dashboard</h1>
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl-3"><div class="card stat-card"><div class="card-body"><div class="label"><i class="bi bi-people"></i> Active students</div><div class="value">{{ total_students }}</div></div></div></div>
+  <div class="col-6 col-xl-3"><div class="card stat-card"><div class="card-body"><div class="label"><i class="bi bi-book"></i> Active courses</div><div class="value">{{ total_courses }}</div></div></div></div>
+  <div class="col-6 col-xl-3"><div class="card stat-card"><div class="card-body"><div class="label"><i class="bi bi-person-badge"></i> Lecturers</div><div class="value">{{ total_lecturers }}</div></div></div></div>
+  <div class="col-6 col-xl-3"><div class="card stat-card"><div class="card-body"><div class="label"><i class="bi bi-journal-check"></i> Registrations {{ session|default:"" }}</div><div class="value">{{ registrations }}</div></div></div></div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between"><span>Results awaiting approval</span><a href="{% url 'approval_list' %}" class="small">View all</a></div>
+      <div class="card-body p-0">
+        <table class="table table-sm table-hover mb-0">
+          <thead><tr><th class="ps-3">Course</th><th>Session</th><th class="text-end pe-3">Results</th></tr></thead>
+          <tbody>
+          {% for p in pending %}
+            <tr><td class="ps-3"><a href="{% url 'course_results' p.registration__course__id %}?session={{ p.registration__session__id }}">{{ p.registration__course__code }}</a> {{ p.registration__course__title }}</td><td>{{ p.registration__session__name }}</td><td class="text-end pe-3"><span class="badge text-bg-warning">{{ p.n }}</span></td></tr>
+          {% empty %}
+            <tr><td colspan="3" class="text-muted ps-3 py-3">Nothing waiting for approval.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card h-100">
+      <div class="card-header">Active students by level</div>
+      <div class="card-body">
+        {% for row in by_level %}
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span>{{ row.level }} Level</span>
+            <div class="flex-grow-1 mx-3"><div class="progress" style="height:8px"><div class="progress-bar" style="width: {% widthratio row.n total_students 100 %}%"></div></div></div>
+            <strong>{{ row.n }}</strong>
+          </div>
+        {% empty %}<p class="text-muted mb-0">No students yet.</p>{% endfor %}
+      </div>
+    </div>
+  </div>
+  {% if user.is_admin_role %}
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between"><span>Recent activity</span><a href="{% url 'audit_log' %}" class="small">Full audit log</a></div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <tbody>
+          {% for log in recent_logs %}
+            <tr><td class="ps-3 text-muted small text-nowrap">{{ log.timestamp|date:"d M H:i" }}</td><td>{{ log.user|default:"system" }}</td><td><span class="badge text-bg-{{ log.action|status_color }}">{{ log.get_action_display }}</span></td><td>{{ log.model_name }}: {{ log.object_repr|truncatechars:70 }}</td></tr>
+          {% empty %}<tr><td class="ps-3 text-muted">No activity yet.</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

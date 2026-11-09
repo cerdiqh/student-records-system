@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Staff accounts{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h4 mb-0">Staff accounts</h1>
+  <a href="{% url 'staff_create' %}" class="btn btn-sm btn-primary"><i class="bi bi-person-plus"></i> New staff account</a>
+</div>
+<form class="row g-2 mb-3" method="get">
+  <div class="col-md-5"><input type="search" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Search name, username or email"></div>
+  <div class="col-md-3"><select name="role" class="form-select form-select-sm"><option value="">All roles</option>{% for v, l in roles %}{% if v != "STUDENT" %}<option value="{{ v }}" {% if role == v %}selected{% endif %}>{{ l }}</option>{% endif %}{% endfor %}</select></div>
+  <div class="col-md-4"><button class="btn btn-sm btn-secondary">Filter</button></div>
+</form>
+<div class="card"><div class="card-body p-0 table-responsive">
+  <table class="table table-hover mb-0 align-middle">
+    <thead><tr><th class="ps-3">Name</th><th>Username</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for u in page %}
+      <tr><td class="ps-3">{{ u }}</td><td>{{ u.username }}</td><td>{{ u.email|default:"-" }}</td><td>{{ u.get_role_display }}</td>
+        <td>{% if u.is_active %}<span class="badge text-bg-success">Active</span>{% else %}<span class="badge text-bg-secondary">Disabled</span>{% endif %}</td>
+        <td class="text-end pe-3"><a href="{% url 'staff_edit' u.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a></td></tr>
+    {% empty %}<tr><td colspan="6" class="ps-3 py-3 text-muted">No staff accounts.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div></div>
+{% include "includes/pagination.html" %}
+{% endblock %}

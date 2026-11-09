@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Course registration{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3">
+  <div>
+    <h1 class="h4 mb-0">Course registration</h1>
+    <div class="text-muted">{{ student.matric_no }} &middot; {{ student.full_name }} &middot; {{ session }} {{ semester }}</div>
+  </div>
+  <div class="text-end">
+    <div class="small text-muted">Units registered</div>
+    <div class="fs-4 fw-semibold {% if current_units > max_units %}text-danger{% endif %}">{{ current_units }} / {{ max_units }}</div>
+  </div>
+</div>
+
+{% if not can_edit %}
+  <div class="alert alert-warning py-2"><i class="bi bi-lock"></i> Course registration is closed for this semester{% if student.status != "ACTIVE" %}, or your status is not active{% endif %}. Contact the records office for changes.</div>
+{% endif %}
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">Registered this semester</div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0 align-middle">
+          <thead><tr><th class="ps-3">Code</th><th>Title</th><th>Units</th><th></th></tr></thead>
+          <tbody>
+          {% for reg in registered %}
+            <tr><td class="ps-3">{{ reg.course.code }}</td><td>{{ reg.course.title }}</td><td>{{ reg.course.units }}</td>
+              <td class="text-end pe-3">{% if can_edit %}
+                <form method="post" class="d-inline" onsubmit="return confirm('Drop {{ reg.course.code }}?')">{% csrf_token %}
+                  <input type="hidden" name="action" value="drop"><input type="hidden" name="registration" value="{{ reg.pk }}">
+                  <button class="btn btn-sm btn-outline-danger py-0">Drop</button></form>{% endif %}</td></tr>
+          {% empty %}
+            <tr><td colspan="4" class="ps-3 py-3 text-muted">No courses registered yet.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">Available courses</div>
+      <form method="post">{% csrf_token %}
+        <div class="card-body p-0">
+          <table class="table table-sm mb-0 align-middle">
+            <thead><tr><th class="ps-3"></th><th>Code</th><th>Title</th><th>Units</th><th>Type</th></tr></thead>
+            <tbody>
+            {% for c in available %}
+              <tr>
+                <td class="ps-3"><input class="form-check-input unit-box" type="checkbox" name="courses" value="{{ c.pk }}" data-units="{{ c.units }}" id="c{{ c.pk }}" {% if not can_edit %}disabled{% endif %}></td>
+                <td><label for="c{{ c.pk }}">{{ c.code }}</label></td><td>{{ c.title }}</td><td>{{ c.units }}</td>
+                <td>{% if c.pk in failed_ids %}<span class="badge text-bg-danger">Carry-over</span>{% elif c.is_elective %}<span class="badge text-bg-info">Elective</span>{% else %}<span class="badge text-bg-secondary">Core</span>{% endif %}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="5" class="ps-3 py-3 text-muted">No more courses available for your level this semester.</td></tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% if available and can_edit %}
+        <div class="card-footer bg-white d-flex justify-content-between align-items-center">
+          <span class="small text-muted">Selected: <strong id="sel">0</strong> units</span>
+          <button class="btn btn-primary btn-sm"><i class="bi bi-check2"></i> Register selected</button>
+        </div>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  document.querySelectorAll('.unit-box').forEach(b => b.addEventListener('change', () => {
+    let t = 0; document.querySelectorAll('.unit-box:checked').forEach(x => t += +x.dataset.units);
+    document.getElementById('sel').textContent = t;
+  }));
+</script>
+{% endblock %}

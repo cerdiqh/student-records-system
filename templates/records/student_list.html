@@ -1,0 +1,41 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Students{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+  <h1 class="h4 mb-0">Students <span class="text-muted fs-6">({{ page.paginator.count }})</span></h1>
+  <div class="d-flex gap-2">
+    <a href="{% url 'student_export' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-download"></i> Export CSV</a>
+    <a href="{% url 'student_create' %}" class="btn btn-sm btn-primary"><i class="bi bi-person-plus"></i> New student</a>
+  </div>
+</div>
+<form class="row g-2 mb-3" method="get">
+  <div class="col-md-5"><input type="search" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Search matric number or name"></div>
+  <div class="col-6 col-md-2"><select name="level" class="form-select form-select-sm"><option value="">All levels</option>{% for v, l in levels %}<option value="{{ v }}" {% if level == v|stringformat:"s" %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div class="col-6 col-md-2"><select name="status" class="form-select form-select-sm"><option value="">All statuses</option>{% for v, l in statuses %}<option value="{{ v }}" {% if status == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div class="col-md-3"><button class="btn btn-sm btn-secondary">Filter</button> <a href="{% url 'student_list' %}" class="btn btn-sm btn-link">Clear</a></div>
+</form>
+<div class="card">
+  <div class="card-body p-0 table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead><tr><th class="ps-3">Matric No</th><th>Name</th><th>Gender</th><th>Level</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      {% for s in page %}
+        <tr>
+          <td class="ps-3 fw-semibold"><a href="{% url 'student_detail' s.pk %}">{{ s.matric_no }}</a></td>
+          <td>{{ s.user.last_name|upper }}, {{ s.user.first_name }}</td>
+          <td>{{ s.get_gender_display }}</td><td>{{ s.level }}</td>
+          <td><span class="badge text-bg-{{ s.status|status_color }}">{{ s.get_status_display }}</span></td>
+          <td class="text-end pe-3 text-nowrap">
+            <a href="{% url 'student_detail' s.pk %}" class="btn btn-sm btn-outline-primary">View</a>
+            <a href="{% url 'student_edit' s.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="ps-3 py-3 text-muted">No students match your search.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% include "includes/pagination.html" %}
+{% endblock %}

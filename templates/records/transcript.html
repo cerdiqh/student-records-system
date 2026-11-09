@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Transcript {{ student.matric_no }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-end gap-2 mb-3 no-print">
+  <button onclick="window.print()" class="btn btn-sm btn-outline-secondary"><i class="bi bi-printer"></i> Print</button>
+  <a href="{% url 'transcript_pdf' student.pk %}" class="btn btn-sm btn-primary"><i class="bi bi-filetype-pdf"></i> Download PDF</a>
+</div>
+<div class="transcript shadow-sm">
+  <div class="text-center mb-4">
+    <h1 class="h5 mb-0 text-uppercase" style="color: var(--sars-navy)">{{ INSTITUTION_NAME }}</h1>
+    <div>{{ DEPARTMENT_NAME }}</div>
+    <div class="fw-bold mt-2">STUDENT ACADEMIC TRANSCRIPT</div>
+  </div>
+  <table class="table table-sm table-borderless small mb-4">
+    <tr><th style="width:18%">Name</th><td>{{ student.user.last_name|upper }}, {{ student.user.first_name }}</td><th style="width:18%">Matric No</th><td>{{ student.matric_no }}</td></tr>
+    <tr><th>Department</th><td>{{ student.department }}</td><th>Level</th><td>{{ student.get_level_display }}</td></tr>
+    <tr><th>Gender</th><td>{{ student.get_gender_display }}</td><th>Entry session</th><td>{{ student.entry_session }}</td></tr>
+    <tr><th>Status</th><td>{{ student.get_status_display }}</td><th>Date issued</th><td>{{ generated|date:"d M Y" }}</td></tr>
+  </table>
+
+  {% for sem in semesters %}
+    <h2 class="h6 mt-3" style="color: var(--sars-navy)">{{ sem.session }} Session &middot; {{ sem.semester }}</h2>
+    <table class="table table-sm table-bordered small">
+      <thead class="table-light"><tr><th>Code</th><th>Course title</th><th class="text-center">Units</th><th class="text-center">Score</th><th class="text-center">Grade</th><th class="text-center">GP</th><th class="text-center">Points</th></tr></thead>
+      <tbody>
+      {% for r in sem.results %}
+        <tr><td>{{ r.registration.course.code }}</td><td>{{ r.registration.course.title }}</td><td class="text-center">{{ r.registration.course.units }}</td><td class="text-center">{{ r.total|floatformat:0 }}</td><td class="text-center">{{ r.grade }}</td><td class="text-center">{{ r.grade_point }}</td><td class="text-center">{% widthratio r.registration.course.units 1 r.grade_point %}</td></tr>
+      {% endfor %}
+      </tbody>
+      <tfoot><tr class="table-light"><th colspan="2">Semester totals</th><th class="text-center">{{ sem.units }}</th><th colspan="3"></th><th class="text-center">{{ sem.points }}</th></tr></tfoot>
+    </table>
+    <div class="small mb-2"><strong>GPA:</strong> {{ sem.gpa }} &nbsp; <strong>CGPA:</strong> {{ sem.cgpa }}</div>
+  {% empty %}
+    <p class="text-muted">No approved results on record.</p>
+  {% endfor %}
+
+  <table class="table table-sm table-bordered w-auto mt-4">
+    <tr><th>Cumulative GPA</th><td>{{ cgpa }}</td></tr>
+    <tr><th>Total units passed</th><td>{{ units_passed }}</td></tr>
+    <tr><th>Class of degree (current standing)</th><td>{{ degree_class }}</td></tr>
+  </table>
+  <p class="small text-muted">Grading: {% for m, g, p in grading_scale %}{{ g }} ({{ m }}+) = {{ p }}{% if not forloop.last %}, {% endif %}{% endfor %}. Only results approved by the records office appear on this transcript.</p>
+  <div class="mt-5 pt-3">______________________________<br>Records Officer / Registrar</div>
+</div>
+{% endblock %}

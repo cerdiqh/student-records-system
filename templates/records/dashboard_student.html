@@ -1,0 +1,32 @@
+{% extends "base.html" %}{% load ui %}
+{% block content %}
+<h1 class="h4 mb-1">Welcome, {{ student.user.first_name }}</h1>
+<p class="text-muted">{{ student.matric_no }} &middot; {{ student.get_level_display }} &middot; <span class="badge text-bg-{{ student.status|status_color }}">{{ student.get_status_display }}</span></p>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl-3"><div class="card stat-card"><div class="card-body"><div class="label">CGPA (5.0 scale)</div><div class="value">{{ cgpa }}</div></div></div></div>
+  <div class="col-6 col-xl-3"><div class="card stat-card"><div class="card-body"><div class="label">Units passed</div><div class="value">{{ units_passed }}</div></div></div></div>
+  <div class="col-12 col-xl-6"><div class="card stat-card"><div class="card-body"><div class="label">Current standing</div><div class="value fs-5 pt-2">{{ degree_class }}</div></div></div></div>
+</div>
+
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>Registered courses &middot; {{ session|default:"" }}</span>
+    <a href="{% url 'register_courses' %}" class="btn btn-sm btn-primary"><i class="bi bi-journal-plus"></i> Course registration</a>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-sm mb-0">
+      <thead><tr><th class="ps-3">Code</th><th>Title</th><th>Semester</th><th>Units</th><th>Result</th></tr></thead>
+      <tbody>
+      {% for r in current_regs %}
+        <tr><td class="ps-3">{{ r.course.code }}</td><td>{{ r.course.title }}</td><td>{{ r.course.get_semester_display }}</td><td>{{ r.course.units }}</td>
+          <td>{% if r.result.status == "APPROVED" %}<span class="badge text-bg-{{ r.result.grade|grade_color }}">{{ r.result.grade }}</span> {{ r.result.total|floatformat:0 }}{% else %}<span class="text-muted small">Pending</span>{% endif %}</td></tr>
+      {% empty %}
+        <tr><td colspan="5" class="ps-3 py-3 text-muted">You have not registered any courses this session.</td></tr>
+      {% endfor %}
+      </tbody>
+      {% if current_regs %}<tfoot><tr><th class="ps-3" colspan="3">Total units</th><th colspan="2">{{ current_units }}</th></tr></tfoot>{% endif %}
+    </table>
+  </div>
+</div>
+{% endblock %}

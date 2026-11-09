@@ -1,0 +1,24 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Audit log{% endblock %}
+{% block content %}
+<h1 class="h4 mb-1">Audit log</h1>
+<p class="text-muted">Every change to academic records is recorded here and cannot be edited.</p>
+<form class="row g-2 mb-3" method="get">
+  <div class="col-md-5"><input type="search" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Search record, change or username"></div>
+  <div class="col-md-3"><select name="action" class="form-select form-select-sm"><option value="">All actions</option>{% for v, l in actions %}<option value="{{ v }}" {% if action == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div class="col-md-4"><button class="btn btn-sm btn-secondary">Filter</button> <a href="{% url 'audit_log' %}" class="btn btn-sm btn-link">Clear</a></div>
+</form>
+<div class="card"><div class="card-body p-0 table-responsive">
+  <table class="table table-sm mb-0 align-middle">
+    <thead><tr><th class="ps-3">Time</th><th>User</th><th>Action</th><th>Record</th><th>Changes</th><th>IP</th></tr></thead>
+    <tbody>
+    {% for log in page %}
+      <tr><td class="ps-3 text-nowrap small">{{ log.timestamp|date:"d M Y H:i:s" }}</td><td>{{ log.user|default:"system" }}</td>
+        <td><span class="badge text-bg-{{ log.action|status_color }}">{{ log.get_action_display }}</span></td>
+        <td class="small">{{ log.model_name }}: {{ log.object_repr }}</td><td class="small text-muted">{{ log.changes|default:"" }}</td><td class="small text-muted">{{ log.ip_address|default:"" }}</td></tr>
+    {% empty %}<tr><td colspan="6" class="ps-3 py-3 text-muted">No entries.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div></div>
+{% include "includes/pagination.html" %}
+{% endblock %}

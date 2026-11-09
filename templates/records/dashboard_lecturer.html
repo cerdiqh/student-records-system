@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="h4 mb-1">Welcome, {{ user }}</h1>
+<p class="text-muted">Your courses for the {{ session|default:"current" }} session. Enter scores, then submit them to the records office for approval.</p>
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0 align-middle">
+      <thead><tr><th class="ps-3">Code</th><th>Title</th><th>Level</th><th>Semester</th><th>Enrolled</th><th>Submitted</th><th></th></tr></thead>
+      <tbody>
+      {% for c in courses %}
+        <tr>
+          <td class="ps-3 fw-semibold">{{ c.code }}</td><td>{{ c.title }}</td><td>{{ c.level }}</td><td>{{ c.get_semester_display }}</td>
+          <td>{{ c.enrolled }}</td>
+          <td>{% if c.enrolled %}{{ c.submitted }} / {{ c.enrolled }}{% else %}-{% endif %}</td>
+          <td class="text-end pe-3"><a href="{% url 'course_results' c.pk %}" class="btn btn-sm btn-primary"><i class="bi bi-pencil-square"></i> Enter results</a></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="7" class="ps-3 py-3 text-muted">No courses are assigned to you yet. Ask the records office to assign your courses.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

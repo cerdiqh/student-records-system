@@ -1,0 +1,500 @@
+import csv
+import io
+from decimal import Decimal, InvalidOperation
+
+from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
+from django.core.paginator import Paginator
+from django.db import transaction
+from django.db.models import Count, Q
+from django.http import HttpResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils import timezone
+from django.views.decorators.http import require_POST
+
+from accounts.decorators import admin_required, lecturer_or_staff_required, staff_required
+from accounts.models import User
+from academics.models import AcademicSession, Course, Level
+
+from .forms import ResultEntryForm, ResultUploadForm, StudentForm
+from .models import AuditLog, Registration, Result, Student
+from .transcript import build_transcript_pdf
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+def _can_view_student(user, student):
+    return user.is_staff_member or (user.is_student and student.user_id == user.pk)
+
+
+def _can_manage_course_results(user, course):
+    return user.is_staff_member or (user.is_lecturer and course.lecturer_id == user.pk)
+
+
+def _selected_session(request):
+    sid = request.GET.get("session") or request.POST.get("session")
+    if sid:
+        return get_object_or_404(AcademicSession, pk=sid)
+    session = AcademicSession.get_current()
+    if session is None:
+        raise PermissionDenied("No current academic session has been set up yet.")
+    return session
+
+
+# ---------------------------------------------------------------------------
+# Dashboard
+# ---------------------------------------------------------------------------
+@login_required
+def dashboard(request):
+    user = request.user
+    session = AcademicSession.get_current()
+    ctx = {"session": session}
+
+    if user.is_staff_member:
+        ctx.update(
+            total_students=Student.objects.filter(status=Student.Status.ACTIVE).count(),
+            total_courses=Course.objects.filter(is_active=True).count(),
+            total_lecturers=User.objects.filter(role=User.Role.LECTURER, is_active=True).count(),
+            registrations=Registration.objects.filter(session=session).count() if session else 0,
+            by_level=Student.objects.filter(status=Student.Status.ACTIVE)
+            .values("level").annotate(n=Count("id")).order_by("level"),
+            pending=Result.objects.filter(status=Result.Status.SUBMITTED)
+            .values("registration__course__id", "registration__course__code",
+                    "registration__course__title", "registration__session__id",
+                    "registration__session__name")
+            .annotate(n=Count("id")).order_by("registration__course__code"),
+            recent_logs=AuditLog.objects.select_related("user")[:8],
+        )
+        return render(request, "records/dashboard_staff.html", ctx)
+
+    if user.is_lecturer:
+        courses = Course.objects.filter(lecturer=user, is_active=True).annotate(
+            enrolled=Count("registrations", filter=Q(registrations__session=session)),
+            submitted=Count("registrations__result", filter=Q(
+                registrations__session=session,
+                registrations__result__status__in=[Result.Status.SUBMITTED, Result.Status.APPROVED])),
+        )
+        ctx["courses"] = courses
+        return render(request, "records/dashboard_lecturer.html", ctx)
+
+    if user.is_student:
+        student = getattr(user, "student_profile", None)
+        if student is None:
+            raise PermissionDenied("Your account is not linked to a student record. Contact the records office.")
+        current_regs = Registration.objects.filter(student=student, session=session).select_related("course", "result") if session else []
+        ctx.update(
+            student=student,
+            cgpa=student.cgpa(),
+            degree_class=student.degree_class(),
+            units_passed=student.total_units_passed(),
+            current_regs=current_regs,
+            current_units=sum(r.course.units for r in current_regs),
+        )
+        return render(request, "records/dashboard_student.html", ctx)
+
+    raise PermissionDenied
+
+
+# ---------------------------------------------------------------------------
+# Students
+# ---------------------------------------------------------------------------
+@staff_required
+def student_list(request):
+    students = Student.objects.select_related("user", "department")
+    q = request.GET.get("q", "").strip()
+    if q:
+        students = students.filter(
+            Q(matric_no__icontains=q) | Q(user__first_name__icontains=q) | Q(user__last_name__icontains=q)
+        )
+    level = request.GET.get("level")
+    if level:
+        students = students.filter(level=level)
+    status = request.GET.get("status")
+    if status:
+        students = students.filter(status=status)
+    page = Paginator(students, 25).get_page(request.GET.get("page"))
+    query = request.GET.copy()
+    query.pop("page", None)
+    return render(request, "records/student_list.html", {
+        "page": page, "q": q, "level": level, "status": status,
+        "levels": Level.choices, "statuses": Student.Status.choices, "querystring": query.urlencode(),
+    })
+
+
+@staff_required
+def student_form(request, pk=None):
+    student = get_object_or_404(Student, pk=pk) if pk else None
+    form = StudentForm(request.POST or None, instance=student)
+    if request.method == "POST" and form.is_valid():
+        with transaction.atomic():
+            saved = form.save()
+        messages.success(request, f"Record for {saved.full_name} ({saved.matric_no}) saved.")
+        return redirect("student_detail", pk=saved.pk)
+    title = f"Edit {student.matric_no}" if student else "Register new student"
+    return render(request, "form.html", {"form": form, "title": title, "back": "student_list"})
+
+
+@login_required
+def student_detail(request, pk):
+    student = get_object_or_404(Student.objects.select_related("user", "department", "entry_session"), pk=pk)
+    if not _can_view_student(request.user, student):
+        raise PermissionDenied
+    pending = Registration.objects.filter(student=student).exclude(
+        result__status=Result.Status.APPROVED
+    ).select_related("course", "session", "result")
+    return render(request, "records/student_detail.html", {
+        "student": student,
+        "semesters": student.semester_breakdown(),
+        "cgpa": student.cgpa(),
+        "degree_class": student.degree_class(),
+        "units_passed": student.total_units_passed(),
+        "pending": pending,
+    })
+
+
+@login_required
+def my_record(request):
+    student = getattr(request.user, "student_profile", None)
+    if student is None:
+        return redirect("dashboard")
+    return redirect("student_detail", pk=student.pk)
+
+
+@admin_required
+@require_POST
+def student_delete(request, pk):
+    student = get_object_or_404(Student, pk=pk)
+    if Result.objects.filter(registration__student=student, status=Result.Status.APPROVED).exists():
+        messages.error(request, "This student has approved results. Change their status to Withdrawn instead of deleting.")
+        return redirect("student_detail", pk=pk)
+    name = str(student)
+    with transaction.atomic():
+        user = student.user
+        student.delete()
+        user.delete()
+    messages.success(request, f"Deleted {name}.")
+    return redirect("student_list")
+
+
+@staff_required
+def export_students(request):
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = 'attachment; filename="students.csv"'
+    writer = csv.writer(response)
+    writer.writerow(["Matric No", "Surname", "Other Names", "Gender", "Level", "Status", "Email", "Phone", "CGPA"])
+    for s in Student.objects.select_related("user"):
+        writer.writerow([s.matric_no, s.user.last_name, s.user.first_name, s.get_gender_display(),
+                         s.level, s.get_status_display(), s.user.email, s.user.phone, s.cgpa()])
+    return response
+
+
+# ---------------------------------------------------------------------------
+# Course registration
+# ---------------------------------------------------------------------------
+@login_required
+def register_courses(request, pk=None):
+    user = request.user
+    if pk is not None:
+        if not user.is_staff_member:
+            raise PermissionDenied
+        student = get_object_or_404(Student, pk=pk)
+    else:
+        student = getattr(user, "student_profile", None)
+        if student is None:
+            raise PermissionDenied
+    session = AcademicSession.get_current()
+    if session is None:
+        messages.error(request, "No current academic session. Contact the records office.")
+        return redirect("dashboard")
+    semester = session.current_semester
+    can_edit = user.is_staff_member or (session.registration_open and student.status == Student.Status.ACTIVE)
+
+    registered = Registration.objects.filter(
+        student=student, session=session, course__semester=semester
+    ).select_related("course", "result")
+    registered_ids = {r.course_id for r in registered}
+
+    # Courses for the student's level this semester, plus failed courses to carry over.
+    passed_ids = set(
+        Result.objects.filter(registration__student=student, status=Result.Status.APPROVED, grade_point__gt=0)
+        .values_list("registration__course_id", flat=True)
+    )
+    failed_ids = set(
+        Result.objects.filter(registration__student=student, status=Result.Status.APPROVED, grade_point=0)
+        .values_list("registration__course_id", flat=True)
+    ) - passed_ids
+    available = Course.objects.filter(is_active=True, semester=semester).filter(
+        Q(level=student.level) | Q(pk__in=failed_ids)
+    ).exclude(pk__in=registered_ids | passed_ids).order_by("level", "code")
+
+    current_units = sum(r.course.units for r in registered)
+
+    if request.method == "POST":
+        if not can_edit:
+            messages.error(request, "Course registration is closed.")
+            return redirect(request.path)
+        action = request.POST.get("action")
+        if action == "drop":
+            reg = get_object_or_404(Registration, pk=request.POST.get("registration"), student=student, session=session)
+            if hasattr(reg, "result") and (reg.result.status != Result.Status.DRAFT or reg.result.total > 0):
+                messages.error(request, f"{reg.course.code} already has a result and cannot be dropped.")
+            else:
+                reg.delete()
+                messages.success(request, f"Dropped {reg.course.code}.")
+            return redirect(request.path)
+
+        chosen = list(available.filter(pk__in=request.POST.getlist("courses")))
+        new_units = sum(c.units for c in chosen)
+        if not chosen:
+            messages.warning(request, "Select at least one course.")
+        elif current_units + new_units > settings.MAX_UNITS_PER_SEMESTER:
+            messages.error(
+                request,
+                f"That would be {current_units + new_units} units. The maximum is {settings.MAX_UNITS_PER_SEMESTER} per semester.",
+            )
+        else:
+            with transaction.atomic():
+                for c in chosen:
+                    Registration.objects.create(student=student, course=c, session=session)
+            messages.success(request, f"Registered {len(chosen)} course(s), {new_units} units.")
+        return redirect(request.path)
+
+    return render(request, "records/register_courses.html", {
+        "student": student, "session": session, "semester": session.get_current_semester_display(),
+        "registered": registered, "available": available, "failed_ids": failed_ids,
+        "current_units": current_units, "max_units": settings.MAX_UNITS_PER_SEMESTER, "can_edit": can_edit,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Results entry (lecturers) and approval (records office)
+# ---------------------------------------------------------------------------
+@lecturer_or_staff_required
+def course_results(request, pk):
+    course = get_object_or_404(Course, pk=pk)
+    if not _can_manage_course_results(request.user, course):
+        raise PermissionDenied
+    session = _selected_session(request)
+    regs = Registration.objects.filter(course=course, session=session).select_related("student__user")
+    for reg in regs:
+        if not hasattr(reg, "result"):
+            Result.objects.create(registration=reg, entered_by=request.user)
+    results = list(
+        Result.objects.filter(registration__in=regs).select_related("registration__student__user")
+        .order_by("registration__student__matric_no")
+    )
+    rows = [(r, ResultEntryForm(request.POST or None, instance=r, prefix=f"r{r.pk}")) for r in results]
+
+    if request.method == "POST":
+        action = request.POST.get("action", "save")
+        editable = [(r, f) for r, f in rows if r.status != Result.Status.APPROVED]
+        if all(f.is_valid() for _, f in editable):
+            with transaction.atomic():
+                for r, f in editable:
+                    obj = f.save(commit=False)
+                    obj.entered_by = request.user
+                    if action == "submit":
+                        obj.status = Result.Status.SUBMITTED
+                    obj.save()
+            if action == "submit":
+                messages.success(request, f"Results for {course.code} submitted to the records office for approval.")
+            else:
+                messages.success(request, "Scores saved as draft.")
+            return redirect(f"{request.path}?session={session.pk}")
+        messages.error(request, "Some scores are invalid. Check the highlighted rows.")
+
+    stats = {
+        "count": len(results),
+        "passed": sum(1 for r in results if r.grade_point > 0),
+        "average": (sum(r.total for r in results) / len(results)).quantize(Decimal("0.01")) if results else 0,
+        "grades": {g: sum(1 for r in results if r.grade == g) for _, g, _ in settings.GRADING_SCALE},
+    }
+    return render(request, "records/course_results.html", {
+        "course": course, "session": session, "rows": rows, "stats": stats,
+        "sessions": AcademicSession.objects.all(), "upload_form": ResultUploadForm(),
+        "max_ca": settings.MAX_CA_SCORE, "max_exam": settings.MAX_EXAM_SCORE,
+        "has_editable": any(r.status != Result.Status.APPROVED for r in results),
+    })
+
+
+@lecturer_or_staff_required
+@require_POST
+def course_results_upload(request, pk):
+    course = get_object_or_404(Course, pk=pk)
+    if not _can_manage_course_results(request.user, course):
+        raise PermissionDenied
+    session = _selected_session(request)
+    back = redirect(f"{reverse('course_results', args=[course.pk])}?session={session.pk}")
+    form = ResultUploadForm(request.POST, request.FILES)
+    if not form.is_valid():
+        for err in form.errors.get("file", []):
+            messages.error(request, err)
+        return back
+
+    text = io.TextIOWrapper(form.cleaned_data["file"].file, encoding="utf-8-sig", errors="replace")
+    reader = csv.DictReader(text)
+    headers = {h.strip().lower() for h in (reader.fieldnames or [])}
+    if not {"matric_no", "ca_score", "exam_score"} <= headers:
+        messages.error(request, "CSV must have the columns: matric_no, ca_score, exam_score")
+        return back
+
+    results = {
+        r.registration.student.matric_no.upper(): r
+        for r in Result.objects.filter(registration__course=course, registration__session=session)
+        .select_related("registration__student")
+    }
+    updated, errors = 0, []
+    with transaction.atomic():
+        for line, raw in enumerate(reader, start=2):
+            row = {k.strip().lower(): (v or "").strip() for k, v in raw.items() if k}
+            matric = row.get("matric_no", "").upper()
+            if not matric:
+                continue
+            result = results.get(matric)
+            if result is None:
+                errors.append(f"Row {line}: {matric} is not registered for {course.code} in {session}.")
+                continue
+            if result.status == Result.Status.APPROVED:
+                errors.append(f"Row {line}: {matric} result is already approved and locked.")
+                continue
+            try:
+                ca, exam = Decimal(row["ca_score"] or 0), Decimal(row["exam_score"] or 0)
+            except InvalidOperation:
+                errors.append(f"Row {line}: scores must be numbers.")
+                continue
+            if not (0 <= ca <= settings.MAX_CA_SCORE and 0 <= exam <= settings.MAX_EXAM_SCORE):
+                errors.append(f"Row {line}: CA must be 0-{settings.MAX_CA_SCORE} and exam 0-{settings.MAX_EXAM_SCORE}.")
+                continue
+            result.ca_score, result.exam_score, result.entered_by = ca, exam, request.user
+            result.save()
+            updated += 1
+    messages.success(request, f"Uploaded scores for {updated} student(s).")
+    for e in errors[:15]:
+        messages.warning(request, e)
+    if len(errors) > 15:
+        messages.warning(request, f"...and {len(errors) - 15} more problems.")
+    return back
+
+
+@lecturer_or_staff_required
+def course_results_csv(request, pk):
+    """Download the score sheet as CSV (also serves as the upload template)."""
+    course = get_object_or_404(Course, pk=pk)
+    if not _can_manage_course_results(request.user, course):
+        raise PermissionDenied
+    session = _selected_session(request)
+    response = HttpResponse(content_type="text/csv")
+    fname = f"{course.code.replace(' ', '')}_{session.name.replace('/', '-')}_results.csv"
+    response["Content-Disposition"] = f'attachment; filename="{fname}"'
+    writer = csv.writer(response)
+    writer.writerow(["matric_no", "name", "ca_score", "exam_score", "total", "grade"])
+    regs = Registration.objects.filter(course=course, session=session).select_related("student__user").order_by("student__matric_no")
+    for reg in regs:
+        r = getattr(reg, "result", None)
+        writer.writerow([reg.student.matric_no, reg.student.full_name,
+                         r.ca_score if r else "", r.exam_score if r else "",
+                         r.total if r else "", r.grade if r else ""])
+    return response
+
+
+@staff_required
+def approval_list(request):
+    pending = (
+        Result.objects.filter(status=Result.Status.SUBMITTED)
+        .values("registration__course__id", "registration__course__code", "registration__course__title",
+                "registration__course__lecturer__first_name", "registration__course__lecturer__last_name",
+                "registration__session__id", "registration__session__name")
+        .annotate(n=Count("id"))
+        .order_by("registration__session__name", "registration__course__code")
+    )
+    return render(request, "records/approval_list.html", {"pending": pending})
+
+
+@staff_required
+@require_POST
+def approve_results(request, pk):
+    course = get_object_or_404(Course, pk=pk)
+    session = _selected_session(request)
+    action = request.POST.get("action")
+    qs = Result.objects.filter(registration__course=course, registration__session=session)
+    if action == "approve":
+        to_approve = list(qs.filter(status=Result.Status.SUBMITTED))
+        now = timezone.now()
+        with transaction.atomic():
+            for r in to_approve:
+                r.status, r.approved_by, r.approved_at = Result.Status.APPROVED, request.user, now
+                r.save()
+            AuditLog.objects.create(
+                user=request.user, action=AuditLog.Action.APPROVE, model_name="Result",
+                object_repr=f"{course.code} {session} ({len(to_approve)} results)",
+            )
+        messages.success(request, f"Approved {len(to_approve)} result(s) for {course.code}.")
+    elif action == "return":
+        n = 0
+        for r in qs.filter(status=Result.Status.SUBMITTED):
+            r.status = Result.Status.DRAFT
+            r.save()
+            n += 1
+        messages.info(request, f"Returned {n} result(s) for {course.code} to the lecturer for correction.")
+    elif action == "reopen":
+        if not request.user.is_admin_role:
+            raise PermissionDenied
+        n = 0
+        for r in qs.filter(status=Result.Status.APPROVED):
+            r.status, r.approved_by, r.approved_at = Result.Status.DRAFT, None, None
+            r.save()
+            n += 1
+        messages.warning(request, f"Unlocked {n} approved result(s) for {course.code}.")
+    return redirect(request.POST.get("next") or "approval_list")
+
+
+# ---------------------------------------------------------------------------
+# Transcript
+# ---------------------------------------------------------------------------
+@login_required
+def transcript(request, pk):
+    student = get_object_or_404(Student.objects.select_related("user", "department"), pk=pk)
+    if not _can_view_student(request.user, student):
+        raise PermissionDenied
+    return render(request, "records/transcript.html", {
+        "student": student, "semesters": student.semester_breakdown(),
+        "cgpa": student.cgpa(), "degree_class": student.degree_class(),
+        "units_passed": student.total_units_passed(), "generated": timezone.localtime(),
+        "grading_scale": settings.GRADING_SCALE,
+    })
+
+
+@login_required
+def transcript_pdf(request, pk):
+    student = get_object_or_404(Student.objects.select_related("user", "department"), pk=pk)
+    if not _can_view_student(request.user, student):
+        raise PermissionDenied
+    pdf = build_transcript_pdf(student)
+    response = HttpResponse(pdf, content_type="application/pdf")
+    fname = f"transcript_{student.matric_no.replace('/', '-')}.pdf"
+    response["Content-Disposition"] = f'inline; filename="{fname}"'
+    return response
+
+
+# ---------------------------------------------------------------------------
+# Audit log
+# ---------------------------------------------------------------------------
+@admin_required
+def audit_log(request):
+    logs = AuditLog.objects.select_related("user")
+    q = request.GET.get("q", "").strip()
+    if q:
+        logs = logs.filter(Q(object_repr__icontains=q) | Q(changes__icontains=q) | Q(user__username__icontains=q))
+    action = request.GET.get("action")
+    if action:
+        logs = logs.filter(action=action)
+    page = Paginator(logs, 30).get_page(request.GET.get("page"))
+    query = request.GET.copy()
+    query.pop("page", None)
+    return render(request, "records/audit_log.html", {
+        "page": page, "q": q, "action": action, "actions": AuditLog.Action.choices, "querystring": query.urlencode(),
+    })

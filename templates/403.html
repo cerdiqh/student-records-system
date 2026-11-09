@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Access denied{% endblock %}
+{% block content %}
+<div class="text-center py-5">
+  <i class="bi bi-shield-lock fs-1 text-danger"></i>
+  <h1 class="h4 mt-3">Access denied</h1>
+  <p class="text-muted">{{ exception|default:"You do not have permission to view this page." }}</p>
+  <a href="{% url 'dashboard' %}" class="btn btn-primary">Back to dashboard</a>
+</div>
+{% endblock %}

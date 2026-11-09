@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Courses{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h4 mb-0">{% if user.is_lecturer %}My courses{% else %}Courses{% endif %}</h1>
+  {% if user.is_staff_member %}<a href="{% url 'course_create' %}" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg"></i> New course</a>{% endif %}
+</div>
+<form class="row g-2 mb-3" method="get">
+  <div class="col-md-5"><input type="search" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Search code or title"></div>
+  <div class="col-6 col-md-2"><select name="level" class="form-select form-select-sm"><option value="">All levels</option>{% for v, l in levels %}<option value="{{ v }}" {% if level == v|stringformat:"s" %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div class="col-6 col-md-2"><select name="semester" class="form-select form-select-sm"><option value="">Both semesters</option>{% for v, l in semesters %}<option value="{{ v }}" {% if semester == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div class="col-md-3"><button class="btn btn-sm btn-secondary">Filter</button> <a href="{% url 'course_list' %}" class="btn btn-sm btn-link">Clear</a></div>
+</form>
+<div class="card"><div class="card-body p-0 table-responsive">
+  <table class="table table-hover mb-0 align-middle">
+    <thead><tr><th class="ps-3">Code</th><th>Title</th><th>Units</th><th>Level</th><th>Semester</th><th>Lecturer</th><th>Enrolled</th><th></th></tr></thead>
+    <tbody>
+    {% for c in courses %}
+      <tr class="{% if not c.is_active %}text-muted{% endif %}">
+        <td class="ps-3 fw-semibold">{{ c.code }}{% if c.is_elective %} <span class="badge text-bg-info">E</span>{% endif %}{% if not c.is_active %} <span class="badge text-bg-secondary">Inactive</span>{% endif %}</td>
+        <td>{{ c.title }}</td><td>{{ c.units }}</td><td>{{ c.level }}</td><td>{{ c.get_semester_display }}</td>
+        <td>{{ c.lecturer|default:"-" }}</td><td>{{ c.enrolled }}</td>
+        <td class="text-end pe-3 text-nowrap">
+          <a href="{% url 'course_results' c.pk %}" class="btn btn-sm btn-outline-primary">Results</a>
+          {% if user.is_staff_member %}
+            <a href="{% url 'course_edit' c.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+            <form method="post" action="{% url 'course_delete' c.pk %}" class="d-inline" onsubmit="return confirm('Delete {{ c.code }}?')">{% csrf_token %}<button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form>
+          {% endif %}
+        </td>
+      </tr>
+    {% empty %}<tr><td colspan="8" class="ps-3 py-3 text-muted">No courses found.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div></div>
+{% endblock %}

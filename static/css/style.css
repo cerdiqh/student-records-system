@@ -1,0 +1,52 @@
+:root {
+  --sars-navy: #1f3a5f;
+  --sars-navy-dark: #162b47;
+  --sars-bg: #f4f6f9;
+}
+
+body { background: var(--sars-bg); font-size: 0.95rem; }
+
+.sidebar {
+  width: 240px; min-height: 100vh; background: var(--sars-navy);
+  position: fixed; top: 0; left: 0; z-index: 1030; transition: transform .2s;
+}
+.sidebar .brand { color: #fff; padding: 1.1rem 1.25rem; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,.1); }
+.sidebar .brand small { display: block; font-weight: 400; color: rgba(255,255,255,.6); font-size: .75rem; }
+.sidebar .nav-link { color: rgba(255,255,255,.78); padding: .55rem 1.25rem; border-left: 3px solid transparent; }
+.sidebar .nav-link:hover { color: #fff; background: rgba(255,255,255,.06); }
+.sidebar .nav-link.active { color: #fff; background: var(--sars-navy-dark); border-left-color: #6ea8fe; }
+.sidebar .nav-link i { width: 1.4rem; display: inline-block; }
+.sidebar .section { color: rgba(255,255,255,.45); font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; padding: 1rem 1.25rem .3rem; }
+
+.main { margin-left: 240px; min-height: 100vh; }
+.topbar { background: #fff; border-bottom: 1px solid #e3e7ed; padding: .65rem 1.5rem; }
+.content { padding: 1.5rem; }
+
+.stat-card { border: 0; border-radius: .6rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.stat-card .value { font-size: 1.8rem; font-weight: 600; color: var(--sars-navy); }
+.stat-card .label { color: #6c757d; font-size: .85rem; }
+.card { border-color: #e3e7ed; }
+.card-header { background: #fff; font-weight: 600; }
+.table th { font-weight: 600; color: #495057; white-space: nowrap; }
+.score-input { width: 90px; }
+
+.login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, var(--sars-navy) 0%, #3b6aa0 100%); }
+.login-card { width: 100%; max-width: 400px; border: 0; border-radius: .8rem; }
+
+@media (max-width: 991.98px) {
+  .sidebar { transform: translateX(-100%); }
+  .sidebar.show { transform: none; }
+  .main { margin-left: 0; }
+  .content { padding: 1rem; }
+}
+
+/* Printable transcript */
+.transcript { background: #fff; max-width: 900px; margin: 0 auto; padding: 2rem; }
+@media print {
+  .sidebar, .topbar, .no-print, .messages { display: none !important; }
+  .main { margin: 0; }
+  .content { padding: 0; }
+  body { background: #fff; }
+  .transcript { padding: 0; }
+}

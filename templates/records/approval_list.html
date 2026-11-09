@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Result approvals{% endblock %}
+{% block content %}
+<h1 class="h4 mb-1">Result approvals</h1>
+<p class="text-muted">Results submitted by lecturers. Approved results are locked and appear on student transcripts.</p>
+<div class="card">
+  <div class="card-body p-0 table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead><tr><th class="ps-3">Session</th><th>Course</th><th>Lecturer</th><th>Results</th><th></th></tr></thead>
+      <tbody>
+      {% for p in pending %}
+        <tr>
+          <td class="ps-3">{{ p.registration__session__name }}</td>
+          <td><strong>{{ p.registration__course__code }}</strong> {{ p.registration__course__title }}</td>
+          <td>{{ p.registration__course__lecturer__first_name }} {{ p.registration__course__lecturer__last_name }}</td>
+          <td><span class="badge text-bg-warning">{{ p.n }}</span></td>
+          <td class="text-end pe-3 text-nowrap">
+            <a href="{% url 'course_results' p.registration__course__id %}?session={{ p.registration__session__id }}" class="btn btn-sm btn-outline-primary">Review</a>
+            <form method="post" action="{% url 'approve_results' p.registration__course__id %}" class="d-inline">{% csrf_token %}
+              <input type="hidden" name="session" value="{{ p.registration__session__id }}">
+              <button name="action" value="approve" class="btn btn-sm btn-success" onclick="return confirm('Approve all submitted results for {{ p.registration__course__code }}?')">Approve</button>
+            </form>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="ps-3 py-3 text-muted">No results are waiting for approval.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

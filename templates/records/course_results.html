@@ -1,0 +1,86 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}{{ course.code }} results{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap gap-2 justify-content-between align-items-start mb-3">
+  <div>
+    <h1 class="h4 mb-0">{{ course.code }} &middot; {{ course.title }}</h1>
+    <div class="text-muted">{{ course.units }} units &middot; {{ course.get_level_display }} &middot; {{ course.get_semester_display }} &middot; Lecturer: {{ course.lecturer|default:"Unassigned" }}</div>
+  </div>
+  <form method="get" class="d-flex gap-2">
+    <select name="session" class="form-select form-select-sm" onchange="this.form.submit()">
+      {% for s in sessions %}<option value="{{ s.pk }}" {% if s.pk == session.pk %}selected{% endif %}>{{ s }}</option>{% endfor %}
+    </select>
+  </form>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3"><div class="card stat-card"><div class="card-body py-2"><div class="label">Students</div><div class="value fs-4">{{ stats.count }}</div></div></div></div>
+  <div class="col-6 col-md-3"><div class="card stat-card"><div class="card-body py-2"><div class="label">Passed</div><div class="value fs-4">{{ stats.passed }}</div></div></div></div>
+  <div class="col-6 col-md-3"><div class="card stat-card"><div class="card-body py-2"><div class="label">Average score</div><div class="value fs-4">{{ stats.average }}</div></div></div></div>
+  <div class="col-6 col-md-3"><div class="card stat-card"><div class="card-body py-2"><div class="label">Grade spread</div><div class="small pt-1">{% for g, n in stats.grades.items %}<span class="badge text-bg-{{ g|grade_color }} me-1">{{ g }}: {{ n }}</span>{% endfor %}</div></div></div></div>
+</div>
+
+{% if has_editable %}
+<div class="card mb-3 no-print">
+  <div class="card-body d-flex flex-wrap gap-3 align-items-end">
+    <form method="post" action="{% url 'course_results_upload' course.pk %}" enctype="multipart/form-data" class="d-flex flex-wrap gap-2 align-items-end">
+      {% csrf_token %}<input type="hidden" name="session" value="{{ session.pk }}">
+      <div><label class="form-label small mb-1">Bulk upload scores (CSV: matric_no, ca_score, exam_score)</label>{{ upload_form.file|bs }}</div>
+      <button class="btn btn-outline-primary"><i class="bi bi-upload"></i> Upload</button>
+    </form>
+    <a href="{% url 'course_results_csv' course.pk %}?session={{ session.pk }}" class="btn btn-outline-secondary"><i class="bi bi-download"></i> Download score sheet</a>
+  </div>
+</div>
+{% else %}
+<div class="mb-3"><a href="{% url 'course_results_csv' course.pk %}?session={{ session.pk }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-download"></i> Download score sheet</a></div>
+{% endif %}
+
+<form method="post">
+  {% csrf_token %}<input type="hidden" name="session" value="{{ session.pk }}">
+  <div class="card">
+    <div class="card-body p-0 table-responsive">
+      <table class="table table-sm table-hover mb-0 align-middle">
+        <thead><tr><th class="ps-3">#</th><th>Matric No</th><th>Name</th><th>CA (/{{ max_ca }})</th><th>Exam (/{{ max_exam }})</th><th>Total</th><th>Grade</th><th>Status</th></tr></thead>
+        <tbody>
+        {% for r, f in rows %}
+          <tr {% if f.errors %}class="table-danger"{% endif %}>
+            <td class="ps-3 text-muted">{{ forloop.counter }}</td>
+            <td>{{ r.registration.student.matric_no }}</td>
+            <td>{{ r.registration.student.user.last_name|upper }}, {{ r.registration.student.user.first_name }}</td>
+            {% if r.status == "APPROVED" %}
+              <td>{{ r.ca_score|floatformat:1 }}</td><td>{{ r.exam_score|floatformat:1 }}</td>
+            {% else %}
+              <td><div class="score-input">{{ f.ca_score }}</div>{% for e in f.ca_score.errors %}<div class="small text-danger">{{ e }}</div>{% endfor %}</td>
+              <td><div class="score-input">{{ f.exam_score }}</div>{% for e in f.exam_score.errors %}<div class="small text-danger">{{ e }}</div>{% endfor %}</td>
+            {% endif %}
+            <td class="fw-semibold">{{ r.total|floatformat:0 }}</td>
+            <td><span class="badge text-bg-{{ r.grade|grade_color }}">{{ r.grade }}</span></td>
+            <td><span class="badge text-bg-{{ r.status|status_color }}">{{ r.get_status_display }}</span></td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="8" class="ps-3 py-3 text-muted">No students have registered this course in {{ session }}.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if has_editable %}
+    <div class="card-footer bg-white d-flex flex-wrap gap-2 justify-content-end">
+      <button name="action" value="save" class="btn btn-outline-primary"><i class="bi bi-save"></i> Save draft</button>
+      <button name="action" value="submit" class="btn btn-primary" onclick="return confirm('Submit these results to the records office for approval?')"><i class="bi bi-send"></i> Save &amp; submit for approval</button>
+    </div>
+    {% endif %}
+  </div>
+</form>
+
+{% if user.is_staff_member and rows %}
+<div class="card mt-3 no-print"><div class="card-body d-flex flex-wrap gap-2 align-items-center">
+  <span class="me-auto small text-muted">Records office actions for {{ course.code }} ({{ session }})</span>
+  <form method="post" action="{% url 'approve_results' course.pk %}" class="d-flex gap-2">{% csrf_token %}
+    <input type="hidden" name="session" value="{{ session.pk }}"><input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <button name="action" value="approve" class="btn btn-success btn-sm"><i class="bi bi-check2-all"></i> Approve submitted</button>
+    <button name="action" value="return" class="btn btn-outline-warning btn-sm">Return to lecturer</button>
+    {% if user.is_admin_role %}<button name="action" value="reopen" class="btn btn-outline-danger btn-sm" onclick="return confirm('Unlock approved results for editing? This is recorded in the audit log.')">Unlock approved</button>{% endif %}
+  </form>
+</div></div>
+{% endif %}
+{% endblock %}
