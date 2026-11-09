@@ -9,7 +9,8 @@ from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, Q
-from django.http import HttpResponse
+from django.core import management
+from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -17,9 +18,10 @@ from django.views.decorators.http import require_POST
 
 from accounts.decorators import admin_required, lecturer_or_staff_required, staff_required
 from accounts.models import User
-from academics.models import AcademicSession, Course, Level
+from academics.models import AcademicSession, Course, Department, Level
 
-from .forms import ResultEntryForm, ResultUploadForm, StudentForm
+from . import importers
+from .forms import CSVUploadForm, ResultEntryForm, ResultUploadForm, StudentForm
 from .models import AuditLog, Registration, Result, Student
 from .transcript import build_transcript_pdf
 
@@ -69,6 +71,7 @@ def dashboard(request):
             .annotate(n=Count("id")).order_by("registration__course__code"),
             recent_logs=AuditLog.objects.select_related("user")[:8],
         )
+        ctx["needs_setup"] = not (ctx["total_lecturers"] and ctx["total_courses"] and ctx["total_students"])
         return render(request, "records/dashboard_staff.html", ctx)
 
     if user.is_lecturer:
@@ -128,11 +131,14 @@ def student_list(request):
 @staff_required
 def student_form(request, pk=None):
     student = get_object_or_404(Student, pk=pk) if pk else None
-    form = StudentForm(request.POST or None, instance=student)
+    form = StudentForm(request.POST or None, request.FILES or None, instance=student)
     if request.method == "POST" and form.is_valid():
         with transaction.atomic():
             saved = form.save()
         messages.success(request, f"Record for {saved.full_name} ({saved.matric_no}) saved.")
+        if form.temp_password:
+            messages.warning(request, f"Temporary password for {saved.matric_no}: {form.temp_password} — give it to the "
+                                      "student privately. They must change it at first login. It will not be shown again.")
         return redirect("student_detail", pk=saved.pk)
     title = f"Edit {student.matric_no}" if student else "Register new student"
     return render(request, "form.html", {"form": form, "title": title, "back": "student_list"})
@@ -240,7 +246,7 @@ def register_courses(request, pk=None):
         action = request.POST.get("action")
         if action == "drop":
             reg = get_object_or_404(Registration, pk=request.POST.get("registration"), student=student, session=session)
-            if hasattr(reg, "result") and (reg.result.status != Result.Status.DRAFT or reg.result.total > 0):
+            if hasattr(reg, "result") and (reg.result.status != Result.Status.DRAFT or reg.result.is_complete):
                 messages.error(request, f"{reg.course.code} already has a result and cannot be dropped.")
             else:
                 reg.delete()
@@ -293,25 +299,35 @@ def course_results(request, pk):
         action = request.POST.get("action", "save")
         editable = [(r, f) for r, f in rows if r.status != Result.Status.APPROVED]
         if all(f.is_valid() for _, f in editable):
+            submitted = missing = 0
             with transaction.atomic():
                 for r, f in editable:
                     obj = f.save(commit=False)
                     obj.entered_by = request.user
                     if action == "submit":
-                        obj.status = Result.Status.SUBMITTED
+                        if obj.is_complete:
+                            obj.status = Result.Status.SUBMITTED
+                            submitted += 1
+                        else:
+                            missing += 1
                     obj.save()
             if action == "submit":
-                messages.success(request, f"Results for {course.code} submitted to the records office for approval.")
+                messages.success(request, f"{submitted} result(s) for {course.code} submitted to the records office for approval.")
+                if missing:
+                    messages.warning(request, f"{missing} student(s) have no scores yet and were kept as draft.")
             else:
                 messages.success(request, "Scores saved as draft.")
             return redirect(f"{request.path}?session={session.pk}")
         messages.error(request, "Some scores are invalid. Check the highlighted rows.")
 
+    # Use the saved total (an invalid form may have put unsaved scores on the instance).
+    entered = [r for r in results if r.total is not None]
     stats = {
         "count": len(results),
-        "passed": sum(1 for r in results if r.grade_point > 0),
-        "average": (sum(r.total for r in results) / len(results)).quantize(Decimal("0.01")) if results else 0,
-        "grades": {g: sum(1 for r in results if r.grade == g) for _, g, _ in settings.GRADING_SCALE},
+        "entered": len(entered),
+        "passed": sum(1 for r in entered if r.grade_point > 0),
+        "average": (sum(r.total for r in entered) / len(entered)).quantize(Decimal("0.01")) if entered else "-",
+        "grades": {g: sum(1 for r in entered if r.grade == g) for _, g, _ in settings.GRADING_SCALE},
     }
     return render(request, "records/course_results.html", {
         "course": course, "session": session, "rows": rows, "stats": stats,
@@ -361,10 +377,12 @@ def course_results_upload(request, pk):
             if result.status == Result.Status.APPROVED:
                 errors.append(f"Row {line}: {matric} result is already approved and locked.")
                 continue
+            if not row.get("ca_score") and not row.get("exam_score"):
+                continue  # nothing entered for this student yet
             try:
-                ca, exam = Decimal(row["ca_score"] or 0), Decimal(row["exam_score"] or 0)
-            except InvalidOperation:
-                errors.append(f"Row {line}: scores must be numbers.")
+                ca, exam = Decimal(row["ca_score"]), Decimal(row["exam_score"])
+            except (InvalidOperation, KeyError):
+                errors.append(f"Row {line}: enter both CA and exam scores as numbers.")
                 continue
             if not (0 <= ca <= settings.MAX_CA_SCORE and 0 <= exam <= settings.MAX_EXAM_SCORE):
                 errors.append(f"Row {line}: CA must be 0-{settings.MAX_CA_SCORE} and exam 0-{settings.MAX_EXAM_SCORE}.")
@@ -395,9 +413,10 @@ def course_results_csv(request, pk):
     regs = Registration.objects.filter(course=course, session=session).select_related("student__user").order_by("student__matric_no")
     for reg in regs:
         r = getattr(reg, "result", None)
+        done = r is not None and r.is_complete
         writer.writerow([reg.student.matric_no, reg.student.full_name,
-                         r.ca_score if r else "", r.exam_score if r else "",
-                         r.total if r else "", r.grade if r else ""])
+                         r.ca_score if done else "", r.exam_score if done else "",
+                         r.total if done else "", r.grade if done else ""])
     return response
 
 
@@ -498,3 +517,172 @@ def audit_log(request):
     return render(request, "records/audit_log.html", {
         "page": page, "q": q, "action": action, "actions": AuditLog.Action.choices, "querystring": query.urlencode(),
     })
+
+
+# ---------------------------------------------------------------------------
+# Bulk import (real data from CSV / Excel)
+# ---------------------------------------------------------------------------
+def _csv_template(filename, columns, example_rows):
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    writer = csv.writer(response)
+    writer.writerow(columns)
+    writer.writerows(example_rows)
+    return response
+
+
+@staff_required
+def student_import(request):
+    department = Department.objects.first()
+    form = CSVUploadForm(request.POST or None, request.FILES or None)
+    errors = []
+    if request.method == "POST" and form.is_valid():
+        created, errors = importers.import_students(form.cleaned_data["file"], department)
+        if created:
+            request.session["import_credentials"] = created
+            messages.success(request, f"Imported {len(created)} student(s). Download their login slips now — "
+                                      "the temporary passwords are shown only once.")
+            return render(request, "records/import_done.html", {"created": created, "kind": "students"})
+    return render(request, "records/import.html", {
+        "form": form, "errors": errors, "kind": "students", "title": "Import students",
+        "template_url": reverse("student_import_template"), "columns": importers.STUDENT_COLUMNS,
+        "required": importers.STUDENT_REQUIRED, "sessions": AcademicSession.objects.all(),
+    })
+
+
+@staff_required
+def student_import_template(request):
+    session = AcademicSession.get_current()
+    s = session.name if session else "2025/2026"
+    return _csv_template("students_template.csv", importers.STUDENT_COLUMNS, [
+        ["CSC/2025/001", "Okafor", "Chinedu", "Emeka", "M", "100", s, "chinedu@example.com", "08012345678",
+         "2006-04-12", "Enugu", "12 Main Street", "Mr. Okafor", "08098765432"],
+    ])
+
+
+@staff_required
+def import_credentials(request):
+    """One-time download of the temporary passwords created by the last import."""
+    creds = request.session.pop("import_credentials", None)
+    if not creds:
+        messages.error(request, "These login slips were already downloaded or have expired. "
+                                "Use 'Reset password' on a student's page to issue a new one.")
+        return redirect("student_list")
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = 'attachment; filename="student_login_slips.csv"'
+    writer = csv.writer(response)
+    writer.writerow(["Matric No", "Name", "Username", "Temporary password", "Login address"])
+    login_url = request.build_absolute_uri(reverse("login"))
+    for matric, name, pw in creds:
+        writer.writerow([matric, name, matric, pw, login_url])
+    return response
+
+
+@staff_required
+def course_import(request):
+    department = Department.objects.first()
+    form = CSVUploadForm(request.POST or None, request.FILES or None)
+    errors = []
+    if request.method == "POST" and form.is_valid():
+        created, updated, errors = importers.import_courses(form.cleaned_data["file"], department)
+        if not errors:
+            messages.success(request, f"Courses imported: {created} new, {updated} updated.")
+            return redirect("course_list")
+    return render(request, "records/import.html", {
+        "form": form, "errors": errors, "kind": "courses", "title": "Import courses",
+        "template_url": reverse("course_import_template"), "columns": importers.COURSE_COLUMNS,
+        "required": importers.COURSE_REQUIRED,
+        "lecturers": User.objects.filter(role=User.Role.LECTURER, is_active=True),
+    })
+
+
+@staff_required
+def course_import_template(request):
+    return _csv_template("courses_template.csv", importers.COURSE_COLUMNS, [
+        ["CSC 101", "Introduction to Computer Science", "3", "100", "FIRST", "", "no"],
+        ["CSC 102", "Introduction to Programming", "3", "100", "SECOND", "", "no"],
+    ])
+
+
+# ---------------------------------------------------------------------------
+# End-of-session promotion
+# ---------------------------------------------------------------------------
+@staff_required
+def promote_students(request):
+    session = AcademicSession.get_current()
+    department = Department.objects.first()
+    final = department.final_level if department else 400
+    active = Student.objects.filter(status=Student.Status.ACTIVE)
+    by_level = {row["level"]: row["n"] for row in active.values("level").annotate(n=Count("id"))}
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if session is None:
+            messages.error(request, "Set a current session first.")
+        elif action == "promote":
+            if session.students_promoted:
+                messages.error(request, f"Students were already promoted into {session}. Promotion can only run once per session.")
+            else:
+                moved = 0
+                with transaction.atomic():
+                    # Highest level first, so nobody is promoted twice.
+                    for level in sorted((lv for lv in by_level if lv < final), reverse=True):
+                        moved += active.filter(level=level).update(level=level + 100)
+                    session.students_promoted = True
+                    session.save()
+                    AuditLog.objects.create(user=request.user, action=AuditLog.Action.UPDATE, model_name="Student",
+                                            object_repr=f"Promoted {moved} students into {session}")
+                messages.success(request, f"Promoted {moved} student(s) one level up for {session}.")
+        elif action == "graduate":
+            min_cgpa = Decimal(str(settings.DEGREE_CLASSES[-2][0]))  # lowest passing class
+            candidates = [s for s in active.filter(level=final)]
+            graduated, held = 0, []
+            with transaction.atomic():
+                for s in candidates:
+                    if s.cgpa() >= min_cgpa and not Registration.objects.filter(student=s).exclude(
+                            result__status=Result.Status.APPROVED).exists():
+                        s.status = Student.Status.GRADUATED
+                        s.save()
+                        graduated += 1
+                    else:
+                        held.append(s.matric_no)
+            messages.success(request, f"Marked {graduated} final-year student(s) as graduated.")
+            if held:
+                messages.warning(request, f"Not graduated (CGPA below {min_cgpa} or results still outstanding): "
+                                          + ", ".join(held[:30]) + ("..." if len(held) > 30 else ""))
+        return redirect("promote_students")
+
+    return render(request, "records/promote.html", {
+        "session": session, "by_level": sorted(by_level.items()), "final": final,
+        "final_count": by_level.get(final, 0),
+    })
+
+
+# ---------------------------------------------------------------------------
+# Protected files and backups
+# ---------------------------------------------------------------------------
+@login_required
+def student_photo(request, pk):
+    student = get_object_or_404(Student, pk=pk)
+    if not (_can_view_student(request.user, student) or request.user.is_lecturer):
+        raise PermissionDenied
+    if not student.photo:
+        raise Http404
+    return FileResponse(student.photo.open("rb"))
+
+
+@admin_required
+def backup_download(request):
+    """Download a complete JSON backup of the database (restore with: manage.py loaddata <file>)."""
+    out = io.StringIO()
+    management.call_command(
+        "dumpdata", "--natural-foreign", "--natural-primary", "--indent", "1",
+        "--exclude", "contenttypes", "--exclude", "auth.permission", "--exclude", "sessions",
+        "--exclude", "admin.logentry", stdout=out,
+    )
+    AuditLog.objects.create(user=request.user, action=AuditLog.Action.UPDATE, model_name="Backup",
+                            object_repr="Downloaded full database backup")
+    stamp = timezone.localtime().strftime("%Y%m%d-%H%M")
+    response = HttpResponse(out.getvalue(), content_type="application/json")
+    response["Content-Disposition"] = f'attachment; filename="sars-backup-{stamp}.json"'
+    return response

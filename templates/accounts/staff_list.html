@@ -17,7 +17,9 @@
     {% for u in page %}
       <tr><td class="ps-3">{{ u }}</td><td>{{ u.username }}</td><td>{{ u.email|default:"-" }}</td><td>{{ u.get_role_display }}</td>
         <td>{% if u.is_active %}<span class="badge text-bg-success">Active</span>{% else %}<span class="badge text-bg-secondary">Disabled</span>{% endif %}</td>
-        <td class="text-end pe-3"><a href="{% url 'staff_edit' u.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a></td></tr>
+        <td class="text-end pe-3 text-nowrap">
+          {% if u.pk != user.pk %}<form method="post" action="{% url 'reset_password' u.pk %}" class="d-inline" onsubmit="return confirm('Give {{ u.username }} a new temporary password?')">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-sm btn-outline-warning">Reset password</button></form>{% endif %}
+          <a href="{% url 'staff_edit' u.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a></td></tr>
     {% empty %}<tr><td colspan="6" class="ps-3 py-3 text-muted">No staff accounts.</td></tr>{% endfor %}
     </tbody>
   </table>

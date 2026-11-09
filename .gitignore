@@ -6,6 +6,8 @@ db.sqlite3
 .env
 staticfiles/
 media/
+backups/
+logs/
 .vscode/
 .claude/
 *.log

@@ -16,10 +16,39 @@ class Level(models.IntegerChoices):
     L500 = 500, "500 Level"
 
 
+class Institution(models.Model):
+    """Single row holding the school's details (shown on every page and on transcripts)."""
+
+    name = models.CharField("Institution name", max_length=200)
+    address = models.CharField(max_length=255, blank=True)
+    email = models.EmailField(blank=True)
+    phone = models.CharField(max_length=30, blank=True)
+    logo = models.ImageField(upload_to="institution/", blank=True,
+                             help_text="PNG or JPG, max 1 MB. Printed on transcripts.")
+    registrar_name = models.CharField(
+        max_length=150, blank=True, help_text="Name printed under the signature line on transcripts."
+    )
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        self.pk = 1  # enforce a single row
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        return cls.objects.filter(pk=1).first()
+
+
 class Department(models.Model):
-    name = models.CharField(max_length=150, unique=True)
-    code = models.CharField(max_length=10, unique=True)
+    name = models.CharField(max_length=150, unique=True, help_text="e.g. Computer Science")
+    code = models.CharField(max_length=10, unique=True, help_text="e.g. CSC")
     faculty = models.CharField(max_length=150)
+    final_level = models.IntegerField(
+        choices=Level.choices, default=Level.L400,
+        help_text="Final year of the programme (400 for a 4-year degree, 500 for 5 years).",
+    )
     head = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -48,6 +77,10 @@ class AcademicSession(models.Model):
     )
     registration_open = models.BooleanField(
         default=True, help_text="Students may register courses while this is on."
+    )
+    students_promoted = models.BooleanField(
+        default=False, editable=False,
+        help_text="Set once students have been promoted into this session (prevents promoting twice).",
     )
 
     class Meta:

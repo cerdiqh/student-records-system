@@ -1,0 +1,32 @@
+{% extends "auth_base.html" %}{% load ui %}
+{% block title %}First-time setup{% endblock %}
+{% block card_class %}setup-card{% endblock %}
+{% block heading %}Welcome — first-time setup{% endblock %}
+{% block body %}
+<p class="small text-muted">This runs once. Enter your institution's real details and create the administrator account. You can change everything later under <em>Institution Settings</em>.</p>
+<form method="post" novalidate>{% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert alert-danger py-2">{{ form.non_field_errors }}</div>{% endif %}
+  <h2 class="h6 text-uppercase text-muted mt-2">1. Institution and department</h2>
+  <div class="row g-3 mb-4">
+    {% for field in form %}{% if forloop.counter <= 5 %}
+      <div class="col-md-6"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field|bs }}
+        {% for e in field.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}<div class="form-text">{{ field.help_text }}</div></div>
+    {% endif %}{% endfor %}
+  </div>
+  <h2 class="h6 text-uppercase text-muted">2. Current academic session</h2>
+  <div class="row g-3 mb-4">
+    {% for field in form %}{% if forloop.counter > 5 and forloop.counter <= 8 %}
+      <div class="col-md-4"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field|bs }}
+        {% for e in field.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}<div class="form-text">{{ field.help_text }}</div></div>
+    {% endif %}{% endfor %}
+  </div>
+  <h2 class="h6 text-uppercase text-muted">3. Administrator account (you)</h2>
+  <div class="row g-3 mb-4">
+    {% for field in form %}{% if forloop.counter > 8 %}
+      <div class="col-md-6"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field|bs }}
+        {% for e in field.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}</div>
+    {% endif %}{% endfor %}
+  </div>
+  <button class="btn btn-primary w-100">Complete setup</button>
+</form>
+{% endblock %}

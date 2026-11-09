@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Promotion and graduation{% endblock %}
+{% block content %}
+<h1 class="h4 mb-1">Promotion and graduation</h1>
+<p class="text-muted">Run this at the start of a new session, after the new session has been created and set as current.</p>
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">Active students by level</div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead><tr><th class="ps-3">Level</th><th>Students</th><th>After promotion</th></tr></thead>
+          <tbody>
+          {% for level, n in by_level %}
+            <tr><td class="ps-3">{{ level }}</td><td>{{ n }}</td><td>{% if level < final %}{{ level|add:100 }} Level{% else %}<span class="text-muted">stays (final year)</span>{% endif %}</td></tr>
+          {% empty %}<tr><td colspan="3" class="ps-3 text-muted py-3">No active students.</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card mb-3">
+      <div class="card-header">1. Promote to the next level</div>
+      <div class="card-body small">
+        {% if not session %}
+          <div class="text-danger">No current session is set.</div>
+        {% elif session.students_promoted %}
+          <div class="alert alert-success py-2 mb-0">Students have already been promoted into <strong>{{ session }}</strong>.</div>
+        {% else %}
+          <p>Moves every <strong>active</strong> student up one level for <strong>{{ session }}</strong> (100 → 200, etc.). Final-year ({{ final }} level) students are not moved. This can only be done once per session.</p>
+          <form method="post" onsubmit="return confirm('Promote all active students one level up for {{ session }}?')">{% csrf_token %}
+            <button name="action" value="promote" class="btn btn-primary btn-sm"><i class="bi bi-arrow-up-circle"></i> Promote students</button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">2. Graduate final-year students</div>
+      <div class="card-body small">
+        <p>Marks {{ final }}-level students as <strong>Graduated</strong> if every registered course has an approved result and their CGPA is at least a Pass. Others are listed and left as they are. ({{ final_count }} active final-year student{{ final_count|pluralize }}.)</p>
+        <form method="post" onsubmit="return confirm('Mark eligible final-year students as graduated?')">{% csrf_token %}
+          <button name="action" value="graduate" class="btn btn-outline-success btn-sm"><i class="bi bi-mortarboard"></i> Graduate eligible students</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

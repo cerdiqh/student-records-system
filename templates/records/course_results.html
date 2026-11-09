@@ -14,7 +14,7 @@
 </div>
 
 <div class="row g-3 mb-3">
-  <div class="col-6 col-md-3"><div class="card stat-card"><div class="card-body py-2"><div class="label">Students</div><div class="value fs-4">{{ stats.count }}</div></div></div></div>
+  <div class="col-6 col-md-3"><div class="card stat-card"><div class="card-body py-2"><div class="label">Scores entered</div><div class="value fs-4">{{ stats.entered }} <span class="fs-6 text-muted">/ {{ stats.count }}</span></div></div></div></div>
   <div class="col-6 col-md-3"><div class="card stat-card"><div class="card-body py-2"><div class="label">Passed</div><div class="value fs-4">{{ stats.passed }}</div></div></div></div>
   <div class="col-6 col-md-3"><div class="card stat-card"><div class="card-body py-2"><div class="label">Average score</div><div class="value fs-4">{{ stats.average }}</div></div></div></div>
   <div class="col-6 col-md-3"><div class="card stat-card"><div class="card-body py-2"><div class="label">Grade spread</div><div class="small pt-1">{% for g, n in stats.grades.items %}<span class="badge text-bg-{{ g|grade_color }} me-1">{{ g }}: {{ n }}</span>{% endfor %}</div></div></div></div>
@@ -46,15 +46,15 @@
           <tr {% if f.errors %}class="table-danger"{% endif %}>
             <td class="ps-3 text-muted">{{ forloop.counter }}</td>
             <td>{{ r.registration.student.matric_no }}</td>
-            <td>{{ r.registration.student.user.last_name|upper }}, {{ r.registration.student.user.first_name }}</td>
+            <td>{{ r.registration.student.user.last_name|upper }}, {{ r.registration.student.user.first_name }}{% for e in f.non_field_errors %}<div class="small text-danger">{{ e }}</div>{% endfor %}</td>
             {% if r.status == "APPROVED" %}
               <td>{{ r.ca_score|floatformat:1 }}</td><td>{{ r.exam_score|floatformat:1 }}</td>
             {% else %}
               <td><div class="score-input">{{ f.ca_score }}</div>{% for e in f.ca_score.errors %}<div class="small text-danger">{{ e }}</div>{% endfor %}</td>
               <td><div class="score-input">{{ f.exam_score }}</div>{% for e in f.exam_score.errors %}<div class="small text-danger">{{ e }}</div>{% endfor %}</td>
             {% endif %}
-            <td class="fw-semibold">{{ r.total|floatformat:0 }}</td>
-            <td><span class="badge text-bg-{{ r.grade|grade_color }}">{{ r.grade }}</span></td>
+            <td class="fw-semibold">{% if r.total is not None %}{{ r.total|floatformat:0 }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
+            <td>{% if r.grade %}<span class="badge text-bg-{{ r.grade|grade_color }}">{{ r.grade }}</span>{% else %}<span class="text-muted">-</span>{% endif %}</td>
             <td><span class="badge text-bg-{{ r.status|status_color }}">{{ r.get_status_display }}</span></td>
           </tr>
         {% empty %}

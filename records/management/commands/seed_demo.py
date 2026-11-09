@@ -14,7 +14,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
-from academics.models import AcademicSession, Course, Department, Semester
+from academics.models import AcademicSession, Course, Department, Institution, Semester
 from accounts.models import User
 from records.models import Registration, Result, Student
 
@@ -54,6 +54,11 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, force=False, **options):
+        from django.conf import settings
+
+        if not settings.DEBUG:
+            self.stdout.write(self.style.ERROR("seed_demo is for testing only and is disabled when DEBUG=False."))
+            return
         if Department.objects.exists() and not force:
             self.stdout.write(self.style.WARNING("Data already exists. Use --force to add demo data anyway."))
             return
@@ -76,6 +81,8 @@ class Command(BaseCommand):
             make_user("lecturer4", "Aisha", "Garba", User.Role.LECTURER, "Mrs."),
         ]
 
+        if not Institution.load():
+            Institution(name="Demo University", registrar_name="Mrs. Grace Adebayo").save()
         dept, _ = Department.objects.get_or_create(
             code="CSC", defaults=dict(name="Computer Science", faculty="Faculty of Physical Sciences", head=lecturers[1]))
 

@@ -16,6 +16,10 @@ class User(AbstractUser):
     title = models.CharField(
         max_length=20, blank=True, help_text="e.g. Dr., Prof., Mr., Mrs."
     )
+    must_change_password = models.BooleanField(
+        default=False,
+        help_text="User must set a new password at next login (set after an account is created or reset).",
+    )
 
     class Meta:
         ordering = ["last_name", "first_name"]

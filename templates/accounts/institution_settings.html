@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Institution settings{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Institution settings</h1>
+<form method="post" enctype="multipart/form-data" novalidate>{% csrf_token %}
+  <div class="card mb-3">
+    <div class="card-header">Institution (printed on transcripts and the login page)</div>
+    <div class="card-body">
+      {% with form=iform %}{% include "includes/fields.html" %}{% endwith %}
+      {% if iform.instance.logo %}<div class="mt-3"><span class="small text-muted d-block mb-1">Current logo</span><img src="{% url 'institution_logo' %}" alt="Logo" style="max-height:70px"></div>{% endif %}
+    </div>
+  </div>
+  <div class="card mb-3">
+    <div class="card-header">Department</div>
+    <div class="card-body">{% with form=dform %}{% include "includes/fields.html" %}{% endwith %}</div>
+  </div>
+  <button class="btn btn-primary"><i class="bi bi-save"></i> Save settings</button>
+</form>
+
+<div class="card mt-4">
+  <div class="card-header">Backup</div>
+  <div class="card-body">
+    <p class="small text-muted mb-2">Download a complete copy of all records (students, courses, results, users, audit log). Keep it somewhere safe, e.g. a flash drive or Google Drive. Do this at least weekly, and always after results are approved.</p>
+    <a href="{% url 'backup_download' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-download"></i> Download backup now</a>
+  </div>
+</div>
+{% endblock %}

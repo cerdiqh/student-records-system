@@ -1,0 +1,70 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h4 mb-0">{{ title }}</h1>
+  <a href="{% if kind == 'students' %}{% url 'student_list' %}{% else %}{% url 'course_list' %}{% endif %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card mb-3">
+      <div class="card-header">Step 1 — Prepare your file</div>
+      <div class="card-body small">
+        <ol class="mb-2">
+          <li><a href="{{ template_url }}"><i class="bi bi-download"></i> Download the template</a> and open it in Excel.</li>
+          <li>Delete the example row and type or paste your real {{ kind }}, one per row. Keep the first row (the column names) exactly as it is.</li>
+          <li>Save it with <strong>File &gt; Save As &gt; CSV (Comma delimited)</strong>.</li>
+        </ol>
+        <p class="mb-1">Columns (<span class="text-danger">*</span> = required):</p>
+        <div>{% for c in columns %}<code class="me-2">{{ c }}{% if c in required %}<span class="text-danger">*</span>{% endif %}</code>{% endfor %}</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">Step 2 — Upload</div>
+      <div class="card-body">
+        <form method="post" enctype="multipart/form-data">{% csrf_token %}
+          {{ form.file|bs }}
+          {% for e in form.file.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+          <button class="btn btn-primary mt-3"><i class="bi bi-upload"></i> Check and import</button>
+        </form>
+        <p class="small text-muted mt-2 mb-0">The whole file is checked first. If any row has a problem, nothing is imported and every problem is listed so you can fix the file and upload again.</p>
+      </div>
+    </div>
+    {% if errors %}
+    <div class="alert alert-danger mt-3">
+      <strong>Nothing was imported. Fix these {{ errors|length }} problem(s) and upload again:</strong>
+      <ul class="mb-0 mt-2 small">{% for e in errors|slice:":100" %}<li>{{ e }}</li>{% endfor %}</ul>
+      {% if errors|length > 100 %}<div class="small mt-1">…and {{ errors|length|add:"-100" }} more.</div>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header">Rules</div>
+      <div class="card-body small">
+        {% if kind == "students" %}
+          <ul class="mb-0">
+            <li><code>matric_no</code> becomes the student's username. Must be unique.</li>
+            <li><code>gender</code>: M or F.</li>
+            <li><code>level</code>: 100, 200, 300, 400 or 500 (current level).</li>
+            <li><code>entry_session</code> must already exist. Available:
+              {% for s in sessions %}<code>{{ s.name }}</code>{% if not forloop.last %}, {% endif %}{% empty %}<em>none — create one first</em>{% endfor %}</li>
+            <li><code>date_of_birth</code>: 2004-03-21 or 21/03/2004 (optional).</li>
+            <li>Each student gets a <strong>temporary password</strong>. After import you download the login slips once; students must change the password at first login.</li>
+          </ul>
+        {% else %}
+          <ul class="mb-0">
+            <li>A course with an existing <code>code</code> is <strong>updated</strong>; a new code is created.</li>
+            <li><code>units</code>: 1 to 6. <code>level</code>: 100–500.</li>
+            <li><code>semester</code>: FIRST or SECOND (or 1 / 2).</li>
+            <li><code>lecturer_username</code> (optional) must be an existing lecturer account:
+              {% for l in lecturers %}<code>{{ l.username }}</code>{% if not forloop.last %}, {% endif %}{% empty %}<em>none yet</em>{% endfor %}</li>
+            <li><code>elective</code>: yes or no (optional, default no).</li>
+          </ul>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Import complete{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3"><i class="bi bi-check-circle text-success"></i> {{ created|length }} student(s) imported</h1>
+<div class="alert alert-warning">
+  <strong>Download the login slips now.</strong> They contain each student's temporary password and can be downloaded only once.
+  Give each student their own slip privately. Students must change the password the first time they sign in.
+</div>
+<a href="{% url 'import_credentials' %}" class="btn btn-primary mb-3"><i class="bi bi-download"></i> Download login slips (CSV)</a>
+<a href="{% url 'student_list' %}" class="btn btn-outline-secondary mb-3 ms-2">Go to students</a>
+<div class="card"><div class="card-body p-0 table-responsive">
+  <table class="table table-sm mb-0"><thead><tr><th class="ps-3">Matric No</th><th>Name</th></tr></thead>
+    <tbody>{% for matric, name, pw in created %}<tr><td class="ps-3">{{ matric }}</td><td>{{ name }}</td></tr>{% endfor %}</tbody>
+  </table>
+</div></div>
+{% endblock %}

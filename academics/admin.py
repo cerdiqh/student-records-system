@@ -1,6 +1,11 @@
 from django.contrib import admin
 
-from .models import AcademicSession, Course, Department
+from .models import AcademicSession, Course, Department, Institution
+
+
+@admin.register(Institution)
+class InstitutionAdmin(admin.ModelAdmin):
+    list_display = ("name", "email", "phone")
 
 
 @admin.register(Department)

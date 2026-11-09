@@ -1,22 +1,36 @@
 # Centralized Student Academic Records Database System
 
-A web-based system for managing student academic records in a university department: bio-data, course registration, result entry and approval, automatic GPA/CGPA calculation, and transcript generation. All records sit in one central database, protected by role-based access control and an audit trail.
+A web-based system for managing a university department's student academic records in one central database. It covers:
 
-Built with **Python 3.11**, **Django 5.2** and **SQLite** by default. PostgreSQL or MySQL can be used instead. Final-year project.
+- student bio-data and passport photos;
+- course registration;
+- result entry and approval;
+- automatic GPA/CGPA;
+- promotion and graduation;
+- transcript generation.
+
+Access is controlled by role, and every change is recorded in an audit trail.
+
+Built with **Python 3.11** and **Django 5.2**. It runs on SQLite out of the box, and on MySQL or PostgreSQL for larger deployments. Final-year project.
 
 ## Features
 
 | Area | What it does |
 |---|---|
-| **Authentication and roles** | Four roles: Administrator, Records Officer, Lecturer and Student. Each role sees only its own menu and data. |
-| **Student records** | Create, view, update and delete student bio-data. Each student gets a login account (username = matric number). Search, filters and CSV export. |
-| **Academic structure** | Department, academic sessions (one marked *current*), and courses with units, level, semester and assigned lecturer. |
-| **Course registration** | Students register for the current semester's courses. Failed courses show up automatically as carry-overs. A per-semester unit limit is enforced, and the records office can open or close registration. |
-| **Result management** | Lecturers enter CA and exam scores on screen or by CSV upload. Totals, grades and grade points are computed automatically. Results go from Draft to Submitted to Approved; once approved they are locked. |
-| **GPA / CGPA** | Unit-weighted GPA per semester and cumulative CGPA on a 5.0 scale, plus the current class of degree. |
-| **Transcripts** | Printable HTML transcript and a downloadable PDF built with ReportLab. Only approved results appear. |
-| **Audit trail** | Every create, update, delete, approval and login is logged with user, time, IP address and the changed fields. The log is read-only. |
-| **Security** | Hashed passwords, CSRF protection, session timeout, role checks on every view, and server-side score validation. |
+| **First-time setup** | A brand-new installation opens a setup page. There you enter the real institution, faculty, department and current session, and create the administrator account. No demo data is involved. |
+| **Roles** | Administrator, Records Officer, Lecturer and Student. Each sees only their own menu and data. |
+| **Accounts and passwords** | New users get a temporary password, shown once, and **must change it at first login**. Staff can **reset** forgotten passwords. Optional **"Forgot password" by email**. Accounts **lock for 15 minutes after 5 failed logins**. |
+| **Student records** | Create, view, update and delete bio-data, including a passport photo. Search, filters and CSV export. |
+| **Bulk import** | Import real students and courses from Excel/CSV templates. The whole file is checked first, and nothing is imported if any row is wrong. After a student import, printable **login slips** can be downloaded once. |
+| **Academic structure** | Institution settings (name, address, logo, registrar), department, academic sessions, and courses with units, level, semester and lecturer. |
+| **Course registration** | Students register the current semester's courses. Failed courses are added automatically as carry-overs. The unit limit is enforced, and registration can be opened or closed. |
+| **Results** | Lecturers enter CA and exam scores on screen or by CSV upload. Results go Draft → Submitted → Approved. Approved results are locked. Blank scores stay "not entered" and are never counted as 0. |
+| **GPA / CGPA** | Unit-weighted, on a 5.0 scale, with the class of degree. |
+| **Promotion and graduation** | One click promotes all active students to the next level, and can only run once per session. Eligible final-year students can be marked as graduated. |
+| **Transcripts** | Printable HTML and PDF, with the institution logo, student photo and registrar's name. |
+| **Audit trail** | Every create, update, delete, approval, login and backup is logged with user, time, IP address and the changed fields. Read-only. |
+| **Backups** | One-click backup download, plus a `backup` command for scheduled daily backups. |
+| **Security** | Hashed passwords, CSRF protection, session timeout, role checks on every view, and photos served only to authorised users. Production settings refuse to start without a secret key. |
 
 ## Grading policy (configurable in `config/settings.py`)
 
@@ -34,43 +48,39 @@ GPA = Σ(units × grade point) ÷ Σ(units).
 
 Degree classes: First Class ≥ 4.50, 2:1 ≥ 3.50, 2:2 ≥ 2.40, Third ≥ 1.50, Pass ≥ 1.00.
 
-## Getting started (Windows, VS Code)
+## Quick start (development, Windows / VS Code)
 
 ```bash
-# 1. Open the folder in VS Code, then in the terminal:
 python -m venv venv
 venv\Scripts\activate
 pip install -r requirements.txt
-
-# 2. Create the database
 python manage.py migrate
-
-# 3. (Optional) Load demo data: 40 students, 32 courses, 4 sessions of results
-python manage.py seed_demo
-
-# 4. Run
 python manage.py runserver
 ```
 
-Then open http://127.0.0.1:8000.
+Open http://127.0.0.1:8000. The first-time setup page appears.
 
-### Demo accounts (created by `seed_demo`)
+### Getting real data in (after setup)
 
-| Role | Username | Password |
-|---|---|---|
-| Administrator | `admin` | `Admin@1234` |
-| Records Officer | `registrar` | `Pass@1234` |
-| Lecturer | `lecturer1` … `lecturer4` | `Pass@1234` |
-| Student | `CSC/2024/001` (any matric number) | `Pass@1234` |
+1. **Staff Accounts:** create each lecturer. Give them their temporary password privately.
+2. **Courses → Import from CSV:** download the template, fill in your department's courses in Excel, save as CSV and upload.
+3. **Import Students:** same process, then download and hand out the login slips.
+4. **Students** sign in, change their password and register courses.
+5. **Lecturers** enter results; the **Records Officer** approves them.
 
-These are demo passwords. Change them, or start without demo data, for any real use. Without demo data, create the first admin account with `python manage.py createsuperuser`.
+### Putting it into real use
 
-### Using MySQL (XAMPP) or PostgreSQL
+See **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**. It covers running on a department computer for the whole office network, or online on PythonAnywhere, plus email, backups and a go-live checklist.
 
-1. Copy `.env.example` to `.env`.
-2. Set `DB_ENGINE=mysql` (or `postgresql`) and fill in the `DB_*` values.
-3. Install the matching driver: `pip install mysqlclient` or `pip install "psycopg[binary]"`.
-4. Create an empty database named `sars`, then run `python manage.py migrate`.
+Production server: `python serve.py`, which uses Waitress.
+
+### Demo data (for presentations only)
+
+```bash
+python manage.py seed_demo
+```
+
+This loads 40 fictional students and 32 courses. It works only with `DEBUG=True` on an empty database. **Never use it on a real installation.**
 
 ## Running the tests
 
@@ -78,19 +88,28 @@ These are demo passwords. Change them, or start without demo data, for any real 
 python manage.py test
 ```
 
-The tests cover grade boundaries, GPA weighting, the audit trail, role-based access, course registration rules, the enter → submit → approve workflow, the locking of approved results, CSV upload, student creation and PDF transcripts.
+The 29 automated tests cover:
+
+- grading, GPA weighting and the audit trail;
+- role-based access;
+- registration rules, and the enter → submit → approve workflow with locking;
+- blank-score handling, CSV result upload and transcripts;
+- first-time setup;
+- temporary passwords with forced change, login lockout and password resets;
+- student and course import (including all-or-nothing validation);
+- promotion, graduation and backups.
 
 ## Project structure
 
 ```
 config/        settings, URL routes
-accounts/      custom User model with roles, staff management, access-control decorators
-academics/     Department, AcademicSession, Course
-records/       Student, Registration, Result, AuditLog; views, grading, PDF transcript, audit signals
-  management/commands/seed_demo.py   demo data loader
+accounts/      User model with roles, setup wizard, login lockout, password rules, staff management
+academics/     Institution, Department, AcademicSession, Course
+records/       Student, Registration, Result, AuditLog; views, grading, importers, PDF transcript, audit signals
+  management/commands/backup.py      scheduled backups
+  management/commands/seed_demo.py   demo data (development only)
 templates/     Bootstrap 5 HTML templates
 static/        CSS
-docs/          system design (ERD, use cases, architecture)
+docs/          SYSTEM_DESIGN.md (ERD, use cases), DEPLOYMENT.md (going live)
+serve.py       production server (Waitress)
 ```
-
-See [docs/SYSTEM_DESIGN.md](docs/SYSTEM_DESIGN.md) for the database design and diagrams.

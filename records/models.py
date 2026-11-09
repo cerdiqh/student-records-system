@@ -10,6 +10,13 @@ from academics.models import AcademicSession, Course, Department, Level, Semeste
 from .grading import compute_grade
 
 
+def validate_photo(file):
+    if file.size > 1024 * 1024:
+        raise ValidationError("Image is too large (max 1 MB).")
+    if not file.name.lower().endswith((".jpg", ".jpeg", ".png")):
+        raise ValidationError("Upload a JPG or PNG image.")
+
+
 class Student(models.Model):
     class Gender(models.TextChoices):
         MALE = "M", "Male"
@@ -31,6 +38,10 @@ class Student(models.Model):
         AcademicSession, on_delete=models.PROTECT, related_name="entrants"
     )
     gender = models.CharField(max_length=1, choices=Gender.choices)
+    photo = models.ImageField(
+        "Passport photo", upload_to="photos/", blank=True,
+        validators=[validate_photo], help_text="JPG or PNG, max 1 MB.",
+    )
     date_of_birth = models.DateField(null=True, blank=True)
     state_of_origin = models.CharField(max_length=50, blank=True)
     address = models.TextField(blank=True)
@@ -158,20 +169,23 @@ class Result(models.Model):
     registration = models.OneToOneField(
         Registration, on_delete=models.CASCADE, related_name="result"
     )
+    # Scores are NULL until the lecturer enters them, so "not entered" is never confused with 0.
     ca_score = models.DecimalField(
         "CA score",
         max_digits=5,
         decimal_places=2,
-        default=0,
+        null=True,
+        blank=True,
         validators=[MinValueValidator(0), MaxValueValidator(settings.MAX_CA_SCORE)],
     )
     exam_score = models.DecimalField(
         max_digits=5,
         decimal_places=2,
-        default=0,
+        null=True,
+        blank=True,
         validators=[MinValueValidator(0), MaxValueValidator(settings.MAX_EXAM_SCORE)],
     )
-    total = models.DecimalField(max_digits=5, decimal_places=2, editable=False, default=0)
+    total = models.DecimalField(max_digits=5, decimal_places=2, editable=False, null=True, blank=True)
     grade = models.CharField(max_length=2, editable=False, blank=True)
     grade_point = models.PositiveSmallIntegerField(editable=False, default=0)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.DRAFT)
@@ -203,9 +217,16 @@ class Result(models.Model):
         if self.exam_score is not None and self.exam_score > settings.MAX_EXAM_SCORE:
             raise ValidationError({"exam_score": f"Exam cannot exceed {settings.MAX_EXAM_SCORE}."})
 
+    @property
+    def is_complete(self):
+        return self.ca_score is not None and self.exam_score is not None
+
     def save(self, *args, **kwargs):
-        self.total = Decimal(self.ca_score or 0) + Decimal(self.exam_score or 0)
-        self.grade, self.grade_point = compute_grade(self.total)
+        if self.is_complete:
+            self.total = Decimal(self.ca_score) + Decimal(self.exam_score)
+            self.grade, self.grade_point = compute_grade(self.total)
+        else:
+            self.total, self.grade, self.grade_point = None, "", 0
         super().save(*args, **kwargs)
 
 

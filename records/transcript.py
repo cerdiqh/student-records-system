@@ -7,9 +7,21 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+from academics.models import Institution
 
 NAVY = colors.HexColor("#1f3a5f")
+
+
+def _image(field, width, height):
+    """ReportLab image from an uploaded file, or None if missing/unreadable."""
+    if not field:
+        return None
+    try:
+        return Image(field.path, width=width, height=height, kind="proportional")
+    except Exception:  # noqa: BLE001 - a broken image must never stop a transcript
+        return None
 
 
 def build_transcript_pdf(student):
@@ -24,13 +36,20 @@ def build_transcript_pdf(student):
     small = ParagraphStyle("small", parent=styles["Normal"], fontSize=8, textColor=colors.grey)
     sem_title = ParagraphStyle("sem", parent=styles["Heading4"], textColor=NAVY, spaceBefore=8, spaceAfter=3)
 
-    story = [
-        Paragraph(settings.INSTITUTION_NAME.upper(), h_center),
-        Paragraph(settings.DEPARTMENT_NAME, sub),
-        Spacer(1, 3 * mm),
-        Paragraph("<b>STUDENT ACADEMIC TRANSCRIPT</b>", sub),
-        Spacer(1, 5 * mm),
+    institution = Institution.load()
+    inst_name = institution.name if institution else "Student Academic Records"
+    heading = [
+        Paragraph(inst_name.upper(), h_center),
+        Paragraph(f"{student.department.faculty}<br/>Department of {student.department.name}", sub),
     ]
+    if institution and institution.address:
+        heading.append(Paragraph(institution.address, ParagraphStyle("addr", parent=sub, fontSize=8)))
+    heading += [Spacer(1, 2 * mm), Paragraph("<b>STUDENT ACADEMIC TRANSCRIPT</b>", sub)]
+    logo = _image(institution.logo if institution else None, 22 * mm, 22 * mm)
+    photo = _image(student.photo, 25 * mm, 30 * mm)
+    header = Table([[logo or "", heading, photo or ""]], colWidths=[28 * mm, 124 * mm, 28 * mm])
+    header.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("ALIGN", (2, 0), (2, 0), "RIGHT")]))
+    story = [header, Spacer(1, 5 * mm)]
 
     info = [
         ["Name:", f"{student.user.last_name.upper()}, {student.user.first_name}",
@@ -98,7 +117,9 @@ def build_transcript_pdf(student):
             small,
         ),
         Spacer(1, 14 * mm),
-        Paragraph("______________________________<br/>Records Officer / Registrar", styles["Normal"]),
+        Paragraph("______________________________<br/>"
+                  + (f"{institution.registrar_name}<br/>" if institution and institution.registrar_name else "")
+                  + "Records Officer / Registrar", styles["Normal"]),
     ]
 
     doc.build(story)
